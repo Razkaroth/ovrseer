@@ -7,7 +7,7 @@ import type {
 	CrashReporterI,
 	TUIRendererI,
 } from './types.js';
-import { CrashReporter } from './crash-reporter.js';
+import {CrashReporter} from './crash-reporter.js';
 
 // Options for configuring the ProcessManager
 // cleanupTimeout: max ms to wait for each cleanup process.finished before continuing
@@ -69,7 +69,9 @@ export class ProcessManager implements ProcessManagerI {
 
 	addCleanupProcess(id: string, process: ManagedProcessI): void {
 		this.cleanupProcesses.set(id, process);
-		this.cleanupOrder.push(id);
+		if (!this.cleanupOrder.includes(id)) {
+			this.cleanupOrder.push(id);
+		}
 	}
 
 	removeCleanupProcess(id: string): void {
@@ -102,9 +104,27 @@ export class ProcessManager implements ProcessManagerI {
 					}
 					this.updateTui();
 				})
-				.catch(err => {
+				.catch(async err => {
 					this.tui?.showStatus?.(`Dependency failed to start: ${err.message}`);
-					this.stop();
+					// Attempt to stop all dependencies and await their stop() Promises
+					const deps = Array.from(this.dependencies.values());
+					await Promise.allSettled(
+						deps.map(async dep => {
+							try {
+								await dep.stop();
+							} catch {
+								/* ignore */
+							}
+						}),
+					);
+					// Also run general stop to ensure cleanup processes run
+					try {
+						await this.stop();
+					} catch (e: any) {
+						this.tui?.showStatus?.(
+							`Error during stop after dependency failure: ${e?.message || e}`,
+						);
+					}
 				});
 		} else {
 			for (const [id, proc] of this.mainProcesses) {
@@ -131,7 +151,7 @@ export class ProcessManager implements ProcessManagerI {
 		await Promise.allSettled(
 			mainProcesses
 				.filter(proc => proc.isRunning() || proc.getStatus() === 'stopping')
-				.map(proc => proc.finished.catch(() => { })),
+				.map(proc => proc.finished.catch(() => {})),
 		);
 
 		this.tui?.showStatus?.('Running cleanup processes...');
@@ -161,7 +181,6 @@ export class ProcessManager implements ProcessManagerI {
 			}
 		}
 
-
 		for (const dep of dependencies) {
 			if (dep.isRunning()) {
 				dep.stop();
@@ -171,7 +190,7 @@ export class ProcessManager implements ProcessManagerI {
 		await Promise.allSettled(
 			dependencies
 				.filter(dep => dep.isRunning() || dep.getStatus() === 'stopping')
-				.map(dep => dep.finished.catch(() => { })),
+				.map(dep => dep.finished.catch(() => {})),
 		);
 
 		this.tui?.showStatus?.('Cleanup finished');
@@ -276,12 +295,16 @@ export class ProcessManager implements ProcessManagerI {
 		this.tui.init();
 
 		this.tui.onKeyPress(
-			(key: string, meta?: import('./types').TUIKeyPressMeta) => {
+			async (key: string, meta?: import('./types').TUIKeyPressMeta) => {
 				if (key === 'q' || key === 'C-c') {
 					this.gracefulQuit(key);
 				} else if (key === 's') {
 					if (this.isRunning) {
-						this.stop();
+						try {
+							await this.stop();
+						} catch (e: any) {
+							this.tui?.showStatus?.(`Error stopping: ${e?.message || e}`);
+						}
 					} else {
 						this.start();
 					}
@@ -346,8 +369,14 @@ export class ProcessManager implements ProcessManagerI {
 		process: ManagedProcessI,
 		type: TUIProcessType,
 	): void {
-		process.onCrash(err => {
-			this.handleCrash(id, process, type, err);
+		process.onCrash(async err => {
+			try {
+				await this.handleCrash(id, process, type, err);
+			} catch (e: any) {
+				this.tui?.showStatus?.(
+					`Error handling crash for ${id}: ${e?.message || e}`,
+				);
+			}
 		});
 
 		process.onExit((code, signal) => {
@@ -452,12 +481,12 @@ export class ProcessManager implements ProcessManagerI {
 		})();
 	}
 
-	private handleCrash(
+	private async handleCrash(
 		id: string,
 		process: ManagedProcessI,
 		type: TUIProcessType,
 		error: Error,
-	): void {
+	): Promise<void> {
 		const currentRetries = this.retryCount.get(id) || 0;
 
 		if (type === 'dependency') {
@@ -474,14 +503,21 @@ export class ProcessManager implements ProcessManagerI {
 				);
 				this.crashReporter.saveReport(report);
 			}
-			this.stop();
+			try {
+				await this.stop();
+			} catch (e: any) {
+				this.tui?.showStatus?.(
+					`Error during stop after dependency crash: ${e?.message || e}`,
+				);
+			}
 			return;
 		}
 
 		if (currentRetries < this.maxRetries) {
 			this.retryCount.set(id, currentRetries + 1);
 			this.tui?.showStatus?.(
-				`Process ${id} crashed: ${error.message}. Retry ${currentRetries + 1}/${this.maxRetries
+				`Process ${id} crashed: ${error.message}. Retry ${currentRetries + 1}/${
+					this.maxRetries
 				}`,
 			);
 			process.restart();
@@ -503,8 +539,18 @@ export class ProcessManager implements ProcessManagerI {
 				);
 				this.crashReporter.saveReport(report);
 			}
-			process.stop();
-			this.stop();
+			try {
+				await process.stop();
+			} catch {
+				/* ignore */
+			}
+			try {
+				await this.stop();
+			} catch (e: any) {
+				this.tui?.showStatus?.(
+					`Error during stop after crash: ${e?.message || e}`,
+				);
+			}
 		}
 	}
 

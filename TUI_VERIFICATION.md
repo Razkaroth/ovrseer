@@ -23,7 +23,7 @@ Since the TUI requires an interactive terminal with raw mode support, it cannot 
 ### 1. Start the TUI
 
 ```bash
-cd /home/raz/jale/raz/ovrseer/packages/example
+cd packages/example
 node dist/index.js
 ```
 

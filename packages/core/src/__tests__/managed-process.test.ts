@@ -160,7 +160,7 @@ describe('ManagedProcess', () => {
 			);
 		});
 
-		it('should set listeners to process r events', () => {
+		it('should set listeners to process error events', () => {
 			const process = createManagedProcess(
 				'echo',
 				['hello'],
@@ -231,7 +231,7 @@ describe('ManagedProcess', () => {
 			expect(process.process).not.toBeNull();
 		});
 
-		it('should resolve ready promise immediatly when no ready checks are provided', async () => {
+		it('should resolve ready promise immediately when no ready checks are provided', async () => {
 			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
 			process.start();

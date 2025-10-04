@@ -18,7 +18,7 @@ const redisDependency = new ManagedProcess(
 	'node',
 	['-e', 'setInterval(() => console.log("Redis is ready..."), 1000)'],
 	[{
-		logPattern: /.*ready.*/,
+		logPattern: /Redis is ready/i,
 		timeout: 5000,
 	}],
 	new SimpleLogger(1000, 100),
@@ -73,8 +73,8 @@ const cleanupProcess2 = new ManagedProcess(
 );
 
 
-pm.addCleanupProcess('cleanup', cleanupProcess1);
-pm.addCleanupProcess('cleanup', cleanupProcess2);
+pm.addCleanupProcess('cleanup1', cleanupProcess1);
+pm.addCleanupProcess('cleanup2', cleanupProcess2);
 
 pm.startTuiSession();
 pm.start();
