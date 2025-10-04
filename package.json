@@ -1,0 +1,31 @@
+{
+	"name": "ovrseer",
+	"version": "0.0.0",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo run dev",
+		"lint": "turbo run lint",
+		"test": "turbo run test",
+		"example": "pnpm --filter @ovrseer/example dev"
+	},
+	"workspaces": [
+		"packages/*"
+	],
+	"devDependencies": {
+		"@sindresorhus/tsconfig": "^3.0.1",
+		"@types/node": "^20.0.0",
+		"@vdemedes/prettier-config": "^2.0.1",
+		"prettier": "^2.8.7",
+		"turbo": "^2.0.0",
+		"typescript": "^5.0.3",
+		"xo": "^0.53.1"
+	},
+	"engines": {
+		"node": ">=16"
+	},
+	"packageManager": "pnpm@10.12.1",
+	"prettier": "@vdemedes/prettier-config"
+}
