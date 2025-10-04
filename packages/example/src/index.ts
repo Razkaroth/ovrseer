@@ -9,8 +9,8 @@ const pm = new ProcessManager({
 
 const dbDependency = new ManagedProcess(
 	'sh',
-	['-c', 'sleep 3 && echo "Waiting for database to be ready..."; sleep 10'],
-	[{ logPattern: /.*ready.*/, timeout: 5000 }],
+	['-c', 'sleep 1 && echo "Waiting for database to be ready..."; sleep 3; echo "Database is ready!"; sleep 20'],
+	[{ logPattern: /Database is ready!/, timeout: 5000 }],
 	new SimpleLogger(1000, 100),
 );
 
@@ -25,6 +25,7 @@ const redisDependency = new ManagedProcess(
 );
 
 pm.addDependency('db', dbDependency);
+pm.addDependency('redis', redisDependency);
 
 const webServer = new ManagedProcess(
 	'node',
@@ -51,7 +52,7 @@ pm.addMainProcess('web-server', webServer);
 pm.addMainProcess('api-server', apiServer);
 pm.addMainProcess('worker', worker);
 
-const cleanupProcess = new ManagedProcess(
+const cleanupProcess1 = new ManagedProcess(
 	'node',
 	[
 		'-e',
@@ -61,7 +62,19 @@ const cleanupProcess = new ManagedProcess(
 	new SimpleLogger(1000, 100),
 );
 
-pm.addCleanupProcess('cleanup', cleanupProcess);
+const cleanupProcess2 = new ManagedProcess(
+	'node',
+	[
+		'-e',
+		'console.log("Cleaning up..."); setTimeout(() => console.log("Cleaned up!"), 2000)',
+	],
+	[],
+	new SimpleLogger(1000, 100),
+);
+
+
+pm.addCleanupProcess('cleanup', cleanupProcess1);
+pm.addCleanupProcess('cleanup', cleanupProcess2);
 
 pm.startTuiSession();
 pm.start();
