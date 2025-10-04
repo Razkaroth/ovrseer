@@ -38,7 +38,7 @@ export class SimpleLogger implements ProcessLogger {
 		// Default separator is a newline, but can be changed
 		// we need to manage the default separator being an empty string
 		if (defaultSeparator === undefined) {
-			defaultSeparator = '\n';
+			defaultSeparator = '';
 		}
 		this._defaultSeparator = defaultSeparator;
 		this._eventEmitter = new EventEmitter();
@@ -64,11 +64,13 @@ export class SimpleLogger implements ProcessLogger {
 		index?: number;
 		numberOfLines?: number;
 		separator?: string;
+		mostRecentFirst?: boolean;
 	}) {
 		const {
 			index = 0,
 			numberOfLines = this._maxLogSize,
 			separator = this._defaultSeparator,
+			mostRecentFirst = false,
 		} = options || {};
 		if (index < 0) {
 			throw new Error('Index cannot be negative');
@@ -79,15 +81,29 @@ export class SimpleLogger implements ProcessLogger {
 		if (index >= this._buffer.length) {
 			return '';
 		}
-		// Buffer should be reversed as 0 should be the newest log
-		const reversedIndex = this._buffer.length - index;
-		const numberOfLinesToReturn =
-			numberOfLines > this._buffer.length ? this._buffer.length : numberOfLines;
 
-		return this._buffer
-			.slice(reversedIndex - numberOfLinesToReturn, reversedIndex)
-			.reverse()
-			.join(separator);
+		if (mostRecentFirst) {
+			const reversedIndex = this._buffer.length - index;
+			const numberOfLinesToReturn =
+				numberOfLines > this._buffer.length
+					? this._buffer.length
+					: numberOfLines;
+
+			return this._buffer
+				.slice(reversedIndex - numberOfLinesToReturn, reversedIndex)
+				.reverse()
+				.join(separator);
+		} else {
+			const startIndex = index;
+			const numberOfLinesToReturn =
+				numberOfLines > this._buffer.length
+					? this._buffer.length
+					: numberOfLines;
+
+			return this._buffer
+				.slice(startIndex, startIndex + numberOfLinesToReturn)
+				.join(separator);
+		}
 	}
 
 	public onLog(listener: (chunk: string) => void) {

@@ -81,6 +81,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [logScrollOffset, setLogScrollOffset] = useState(0);
 	const [hasAutoSelected, setHasAutoSelected] = useState(false);
+	const [tailingMap, setTailingMap] = useState<Map<string, boolean>>(new Map());
 	const {stdout} = useStdout();
 
 	const terminalHeight = stdout?.rows ?? 24;
@@ -169,6 +170,17 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 
 	const maxLogLines = terminalHeight - 10;
 
+	const currentProcessKey = logsData ? `${logsData.type}:${logsData.id}` : null;
+	const isTailing = currentProcessKey
+		? tailingMap.get(currentProcessKey) ?? false
+		: false;
+
+	useEffect(() => {
+		if (isTailing && logsData && logLines.length > maxLogLines) {
+			setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+		}
+	}, [logLines, isTailing, logsData, maxLogLines]);
+
 	const visibleLogLines = useMemo(() => {
 		const start = logScrollOffset;
 		const end = start + maxLogLines;
@@ -187,45 +199,88 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				onKeyPress('r');
 			} else if (input === 'R' || (key.ctrl && input === 'r')) {
 				onKeyPress(key.ctrl && input === 'r' ? 'C-r' : 'R');
+			} else if (input === 't') {
+				if (currentProcessKey) {
+					const newTailing = !isTailing;
+					setTailingMap(prev => {
+						const newMap = new Map(prev);
+						newMap.set(currentProcessKey, newTailing);
+						return newMap;
+					});
+					if (newTailing && logLines.length > maxLogLines) {
+						setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+					}
+				}
 			} else if (key.return) {
 				if (processItems[selectedIndex]) {
 					const item = processItems[selectedIndex];
 					onKeyPress('enter', {processInfo: {id: item.id, type: item.type}});
 					setLogScrollOffset(0);
 				}
-			} else if (key.upArrow) {
-				if (logsData && logScrollOffset > 0) {
+			} else if (key.upArrow || input === 'k') {
+				if (logsData) {
+					if (currentProcessKey && isTailing) {
+						setTailingMap(prev => {
+							const newMap = new Map(prev);
+							newMap.set(currentProcessKey, false);
+							return newMap;
+						});
+					}
 					setLogScrollOffset(Math.max(0, logScrollOffset - 1));
-				} else {
-					const newIndex = Math.max(0, selectedIndex - 1);
-					setSelectedIndex(newIndex);
-					if (processItems[newIndex]) {
-						const item = processItems[newIndex];
-						onKeyPress('select', {
-							index: newIndex,
-							processInfo: {id: item.id, type: item.type},
-						});
-					}
 				}
-			} else if (key.downArrow) {
-				if (logsData && logScrollOffset + maxLogLines < logLines.length) {
-					setLogScrollOffset(
-						Math.min(logLines.length - maxLogLines, logScrollOffset + 1),
-					);
-				} else if (!logsData) {
-					const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
-					setSelectedIndex(newIndex);
-					if (processItems[newIndex]) {
-						const item = processItems[newIndex];
-						onKeyPress('select', {
-							index: newIndex,
-							processInfo: {id: item.id, type: item.type},
+			} else if (key.downArrow || input === 'j') {
+				if (logsData) {
+					if (currentProcessKey && isTailing) {
+						setTailingMap(prev => {
+							const newMap = new Map(prev);
+							newMap.set(currentProcessKey, false);
+							return newMap;
 						});
 					}
+					setLogScrollOffset(
+						Math.min(
+							Math.max(0, logLines.length - maxLogLines),
+							logScrollOffset + 1,
+						),
+					);
+				}
+			} else if ((key.ctrl && key.upArrow) || input === 'K') {
+				const newIndex = Math.max(0, selectedIndex - 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
+			} else if ((key.ctrl && key.downArrow) || input === 'J') {
+				const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
 				}
 			} else if (key.pageUp && logsData) {
+				if (currentProcessKey && isTailing) {
+					setTailingMap(prev => {
+						const newMap = new Map(prev);
+						newMap.set(currentProcessKey, false);
+						return newMap;
+					});
+				}
 				setLogScrollOffset(Math.max(0, logScrollOffset - maxLogLines));
 			} else if (key.pageDown && logsData) {
+				if (currentProcessKey && isTailing) {
+					setTailingMap(prev => {
+						const newMap = new Map(prev);
+						newMap.set(currentProcessKey, false);
+						return newMap;
+					});
+				}
 				setLogScrollOffset(
 					Math.min(
 						Math.max(0, logLines.length - maxLogLines),
@@ -339,7 +394,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 											<Text key={actualLineNumber}>
 												<Text dimColor>
 													{String(actualLineNumber).padStart(4, ' ')}│
-												</Text>{' '}
+												</Text>
 												{line}
 											</Text>
 										);
@@ -348,7 +403,8 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 								{logLines.length > maxLogLines && (
 									<Box marginTop={1}>
 										<Text dimColor>
-											↑/↓ scroll line | PgUp/PgDn scroll page
+											j/k/↑/↓ scroll line | PgUp/PgDn scroll page | t toggle
+											tail {isTailing && '(tailing ↓)'}
 										</Text>
 									</Box>
 								)}
@@ -365,8 +421,8 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 			<Box flexDirection="column">
 				<Box borderStyle="single" borderColor="gray" paddingX={1}>
 					<Text dimColor>
-						↑/↓ navigate | enter logs | r restart | R/Ctrl-R restart all | q
-						quit
+						J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail | enter
+						logs | r restart | R/C-r restart all | q quit
 					</Text>
 				</Box>
 				<Box borderStyle="single" borderColor="cyan" paddingX={1}>

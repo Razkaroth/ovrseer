@@ -33,18 +33,18 @@ describe.each([['SimpleLogger', SimpleLogger]])(
 				expect(loggerInstance._logs).toEqual(['test']);
 			});
 
-			it('Should by default get the last maxLogSize logs', () => {
+			it('Should by default get the first maxLogSize logs', () => {
 				const max3 = new logger(10, 3, '');
 				max3.addChunk('1');
 				max3.addChunk('2');
 				max3.addChunk('3');
 				max3.addChunk('4');
-				expect(max3.getLogs()).toBe('432');
+				expect(max3.getLogs()).toBe('123');
 
 				for (let i = 0; i < 10; i++) {
 					loggerInstance.addChunk(`${i}`);
 				}
-				expect(loggerInstance.getLogs()).toBe('98765');
+				expect(loggerInstance.getLogs()).toBe('01234');
 			});
 
 			it('Should trim logs if a new log exedes limit', () => {
@@ -54,7 +54,37 @@ describe.each([['SimpleLogger', SimpleLogger]])(
 				max3.addChunk('3');
 				max3.addChunk('4');
 				expect(max3._logs.length).toBe(3);
-				expect(max3.getLogs()).toBe('432');
+				expect(max3.getLogs()).toBe('234');
+			});
+
+			it('Should get logs with mostRecentFirst=true', () => {
+				const max3 = new logger(10, 3, '');
+				max3.addChunk('1');
+				max3.addChunk('2');
+				max3.addChunk('3');
+				max3.addChunk('4');
+				expect(max3.getLogs({mostRecentFirst: true})).toBe('432');
+
+				const logger2 = new logger(10, 5, '');
+				for (let i = 0; i < 10; i++) {
+					logger2.addChunk(`${i}`);
+				}
+				expect(logger2.getLogs({mostRecentFirst: true})).toBe('98765');
+			});
+
+			it('Should get logs with mostRecentFirst=false (default)', () => {
+				const max3 = new logger(10, 3, '');
+				max3.addChunk('1');
+				max3.addChunk('2');
+				max3.addChunk('3');
+				max3.addChunk('4');
+				expect(max3.getLogs({mostRecentFirst: false})).toBe('123');
+
+				const logger2 = new logger(10, 5, '');
+				for (let i = 0; i < 10; i++) {
+					logger2.addChunk(`${i}`);
+				}
+				expect(logger2.getLogs({mostRecentFirst: false})).toBe('01234');
 			});
 
 			it('Should return a log segment', () => {
@@ -63,8 +93,22 @@ describe.each([['SimpleLogger', SimpleLogger]])(
 				max3.addChunk('2');
 				max3.addChunk('3');
 				max3.addChunk('4');
-				expect(max3.getLogs({index: 0, numberOfLines: 2})).toBe('43');
-				expect(max3.getLogs({index: 1, numberOfLines: 2})).toBe('32');
+				expect(max3.getLogs({index: 0, numberOfLines: 2})).toBe('23');
+				expect(max3.getLogs({index: 1, numberOfLines: 2})).toBe('34');
+			});
+
+			it('Should return a log segment with mostRecentFirst=true', () => {
+				const max3 = new logger(3, 3, '');
+				max3.addChunk('1');
+				max3.addChunk('2');
+				max3.addChunk('3');
+				max3.addChunk('4');
+				expect(
+					max3.getLogs({index: 0, numberOfLines: 2, mostRecentFirst: true}),
+				).toBe('43');
+				expect(
+					max3.getLogs({index: 1, numberOfLines: 2, mostRecentFirst: true}),
+				).toBe('32');
 			});
 
 			it('Should error when trying to create a logger with maxLogs > maxBufferSize', () => {
