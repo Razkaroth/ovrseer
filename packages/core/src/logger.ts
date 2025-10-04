@@ -76,8 +76,8 @@ export class SimpleLogger implements ProcessLogger {
 		if (numberOfLines < 0) {
 			throw new Error('Number of lines cannot be negative');
 		}
-		if (index + numberOfLines > this._buffer.length) {
-			throw new Error('Requested logs are out of bounds');
+		if (index >= this._buffer.length) {
+			return '';
 		}
 		// Buffer should be reversed as 0 should be the newest log
 		const reversedIndex = this._buffer.length - index;

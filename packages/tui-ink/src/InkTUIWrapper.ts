@@ -29,6 +29,8 @@ export class InkTUIWrapper implements TUIRendererI {
 			React.createElement(InkTUIRenderer, {
 				processes: this.currentProcesses,
 				state: this.currentState,
+				statusMessage: this.statusMessage,
+				logsData: this.logsData,
 				onKeyPress: (key, meta) => {
 					this.keyPressCallback?.(key, meta);
 				},

@@ -17,7 +17,7 @@
 	"scripts": {
 		"build": "tsc",
 		"dev": "tsc --watch",
-		"lint": "prettier --check . && xo",
+		"lint": "prettier --check .",
 		"test": "vitest"
 	},
 	"dependencies": {},

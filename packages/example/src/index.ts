@@ -7,23 +7,24 @@ const pm = new ProcessManager({
 	tui: tui,
 });
 
-
 const dbDependency = new ManagedProcess(
-	'node',
-	['-e', 'setInterval(() => console.log("Database is ready..."), 1000)'],
-	[],
+	'sh',
+	['-c', 'sleep 3 && echo "Waiting for database to be ready..."; sleep 10'],
+	[{ logPattern: /.*ready.*/, timeout: 5000 }],
 	new SimpleLogger(1000, 100),
 );
 
 const redisDependency = new ManagedProcess(
 	'node',
 	['-e', 'setInterval(() => console.log("Redis is ready..."), 1000)'],
-	[],
+	[{
+		logPattern: /.*ready.*/,
+		timeout: 5000,
+	}],
 	new SimpleLogger(1000, 100),
 );
 
 pm.addDependency('db', dbDependency);
-
 
 const webServer = new ManagedProcess(
 	'node',
@@ -51,25 +52,16 @@ pm.addMainProcess('api-server', apiServer);
 pm.addMainProcess('worker', worker);
 
 const cleanupProcess = new ManagedProcess(
-	'sh',
-	['echo "Cleaning up..."',
-		'sleep 10',
-		'echo "Cleaned up!"'],
+	'node',
+	[
+		'-e',
+		'console.log("Cleaning up..."); setTimeout(() => console.log("Cleaned up!"), 2000)',
+	],
 	[],
 	new SimpleLogger(1000, 100),
 );
 
-tui.init();
+pm.addCleanupProcess('cleanup', cleanupProcess);
+
+pm.startTuiSession();
 pm.start();
-
-process.on('SIGINT', async () => {
-	console.log('\nShutting down...');
-	tui.destroy();
-	process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-	console.log('\nShutting down...');
-	tui.destroy();
-	process.exit(0);
-});

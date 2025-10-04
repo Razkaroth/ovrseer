@@ -1,459 +1,544 @@
-import { SimpleLogger } from '../logger'
-import type { ReadyCheck } from '../types'
+import {SimpleLogger} from '../logger';
+import type {ReadyCheck} from '../types';
 
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...(actual as any),
-    spawn: vi.fn(),
-  }
-})
+vi.mock('child_process', async importOriginal => {
+	const actual = await importOriginal();
+	return {
+		...(actual as any),
+		spawn: vi.fn(),
+	};
+});
 
-import { spawn } from 'child_process'
+import {spawn} from 'child_process';
 
-import EventEmitter from 'events'
-import { ManagedProcess } from '../managed-process'
-const mockSpawn = vi.mocked(spawn)
+import EventEmitter from 'events';
+import {ManagedProcess} from '../managed-process';
+const mockSpawn = vi.mocked(spawn);
 
 import {
-  makeStubProc,
-  createManagedProcess as createManagedProcessFactory,
-  trackedCreateManagedProcess,
-} from './mocks'
+	makeStubProc,
+	createManagedProcess as createManagedProcessFactory,
+	trackedCreateManagedProcess,
+} from './mocks';
 
 const simpleReadyCheck: ReadyCheck = {
-  logPattern: /ready/i,
-  timeout: 100,
-}
+	logPattern: /ready/i,
+	timeout: 100,
+};
 
 const timeoutReadyCheck: ReadyCheck = {
-  logPattern: /ready/i,
-  timeout: 100,
-}
+	logPattern: /ready/i,
+	timeout: 100,
+};
 
 const passIfNotFoundReadyCheck: ReadyCheck = {
-  logPattern: /does not matter/i,
-  timeout: 100,
-  passIfNotFound: true,
-}
+	logPattern: /does not matter/i,
+	timeout: 100,
+	passIfNotFound: true,
+};
 
 describe('ManagedProcess', () => {
-  let mockLogger: SimpleLogger
-  let readyChecks: ReadyCheck[]
-  let stubStdout: EventEmitter
-  let stubStderr: EventEmitter
-  let procEmitter: EventEmitter
-  let stubProc: any
-  let createdProcesses: ManagedProcess[] = []
-
-  // Helper function to create and track processes for proper cleanup
-  const createManagedProcess = (
-    command: string,
-    args: string[],
-    checks: ReadyCheck[],
-    logger?: SimpleLogger,
-  ) => trackedCreateManagedProcess(createdProcesses, command, args, checks, logger)
-
-  beforeEach(() => {
-    mockLogger = new SimpleLogger(10, 5)
-    readyChecks = [simpleReadyCheck]
-
-    stubStdout = new EventEmitter()
-    stubStderr = new EventEmitter()
-    procEmitter = new EventEmitter()
-    stubProc = Object.assign(procEmitter, {
-      stdout: stubStdout,
-      stderr: stubStderr,
-      kill: vi.fn(),
-      pid: 1234,
-    })
-
-    mockSpawn.mockReturnValue(stubProc as any)
-  })
-
-  afterEach(async () => {
-    // Wait a tick to let any pending promises settle
-    await new Promise((resolve) => setImmediate(resolve))
+	let mockLogger: SimpleLogger;
+	let readyChecks: ReadyCheck[];
+	let stubStdout: EventEmitter;
+	let stubStderr: EventEmitter;
+	let procEmitter: EventEmitter;
+	let stubProc: any;
+	let createdProcesses: ManagedProcess[] = [];
+
+	// Helper function to create and track processes for proper cleanup
+	const createManagedProcess = (
+		command: string,
+		args: string[],
+		checks: ReadyCheck[],
+		logger?: SimpleLogger,
+	) =>
+		trackedCreateManagedProcess(
+			createdProcesses,
+			command,
+			args,
+			checks,
+			logger,
+		);
+
+	beforeEach(() => {
+		mockLogger = new SimpleLogger(10, 5);
+		readyChecks = [simpleReadyCheck];
+
+		stubStdout = new EventEmitter();
+		stubStderr = new EventEmitter();
+		procEmitter = new EventEmitter();
+		stubProc = Object.assign(procEmitter, {
+			stdout: stubStdout,
+			stderr: stubStderr,
+			kill: vi.fn(),
+			pid: 1234,
+		});
+
+		mockSpawn.mockReturnValue(stubProc as any);
+	});
+
+	afterEach(async () => {
+		// Wait a tick to let any pending promises settle
+		await new Promise(resolve => setImmediate(resolve));
+
+		// Cleanup all created processes to prevent timer leaks
+		createdProcesses.forEach(process => {
+			try {
+				process.cleanup();
+			} catch (_e) {
+				// Ignore cleanup errors
+			}
+		});
+		createdProcesses = [];
+
+		vi.clearAllMocks();
+		// Clear any leftover timers that might cause test pollution
+		vi.clearAllTimers();
+		// Use real timers to ensure clean state for next test
+		if (vi.isFakeTimers()) {
+			vi.useRealTimers();
+		}
+	});
+
+	describe('Constructor', () => {
+		it('should initialize with correct properties', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			expect(process.command).toEqual('echo');
+			expect(process.args).toEqual(['hello']);
+			expect(process.readyChecks).toEqual(readyChecks);
+			expect(process.logger).toBe(mockLogger);
+			expect(process.isRunning()).toBe(false);
+			expect(process.getStatus()).toEqual('created');
+		});
+
+		it('should create ready and finished promises', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			expect(process.ready).toBeInstanceOf(Promise);
+			expect(process.finished).toBeInstanceOf(Promise);
+		});
+	});
+
+	describe('start() method', () => {
+		it('should change status to running when starting the process', () => {
+			const process = createManagedProcess(
+				'sleep',
+				['1'],
+				readyChecks,
+				mockLogger,
+			);
+
+			process.start();
+
+			expect(process.getStatus()).toEqual('running');
+		});
+
+		it('should set listeners to process exit events', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			process.start();
+
+			expect(process.process!.listeners('exit').length).toBeGreaterThanOrEqual(
+				1,
+			);
+		});
+
+		it('should set listeners to process r events', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			process.start();
+
+			expect(process.process!.listeners('error').length).toBeGreaterThanOrEqual(
+				1,
+			);
+		});
+
+		it('should set listeners to stdout data events', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			process.start();
+
+			expect(
+				process.process!.stdout!.listeners('data').length,
+			).toBeGreaterThanOrEqual(1);
+		});
+
+		it('should set listeners to stderr data events', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
+
+			process.start();
+
+			expect(
+				process.process!.stderr!.listeners('data').length,
+			).toBeGreaterThanOrEqual(1);
+		});
+
+		it('should throw if process is already running', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
 
-    // Cleanup all created processes to prevent timer leaks
-    createdProcesses.forEach((process) => {
-      try {
-        process.cleanup()
-      } catch (_e) {
-        // Ignore cleanup errors
-      }
-    })
-    createdProcesses = []
+			process.start();
 
-    vi.clearAllMocks()
-    // Clear any leftover timers that might cause test pollution
-    vi.clearAllTimers()
-    // Use real timers to ensure clean state for next test
-    if (vi.isFakeTimers()) {
-      vi.useRealTimers()
-    }
-  })
+			expect(() => process.start()).toThrow();
+		});
+
+		it('should spawn a child process when is called', () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				readyChecks,
+				mockLogger,
+			);
 
-  describe('Constructor', () => {
-    it('should initialize with correct properties', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			process.start();
+
+			expect(process.process).not.toBeNull();
+		});
 
-      expect(process.command).toEqual('echo')
-      expect(process.args).toEqual(['hello'])
-      expect(process.readyChecks).toEqual(readyChecks)
-      expect(process.logger).toBe(mockLogger)
-      expect(process.isRunning()).toBe(false)
-      expect(process.getStatus()).toEqual('created')
-    })
+		it('should resolve ready promise immediatly when no ready checks are provided', async () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-    it('should create ready and finished promises', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			process.start();
 
-      expect(process.ready).toBeInstanceOf(Promise)
-      expect(process.finished).toBeInstanceOf(Promise)
-    })
-  })
+			await expect(process.ready).resolves.toBeUndefined();
+			expect(process.getStatus()).toEqual('ready');
+		});
+
+		it('should resolve ready promise when ready check passes', async () => {
+			const process = createManagedProcess(
+				'echo',
+				['ready'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
 
-  describe('start() method', () => {
-    it('should change status to running when starting the process', () => {
-      const process = createManagedProcess('sleep', ['1'], readyChecks, mockLogger)
+			process.start();
 
-      process.start()
+			// Allow the ready check listeners to be set up before emitting data
+			await new Promise(resolve => setImmediate(resolve));
 
-      expect(process.getStatus()).toEqual('running')
-    })
+			// Emit the ready data to trigger the ready check
+			stubStdout.emit('data', 'ready');
 
-    it('should set listeners to process exit events', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			// Wait for ready promise to resolve
+			await expect(process.ready).resolves.toBeUndefined();
 
-      process.start()
+			// Check status immediately after ready resolves
+			expect(process.getStatus()).toEqual('ready');
+		}, 1000);
 
-      expect(process.process!.listeners('exit').length).toBeGreaterThanOrEqual(1)
-    })
+		it('should reject ready promise when ready check fails', async () => {
+			vi.useFakeTimers();
 
-    it('should set listeners to process r events', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[timeoutReadyCheck],
+				mockLogger,
+			);
 
-      process.start()
+			process.start();
 
-      expect(process.process!.listeners('error').length).toBeGreaterThanOrEqual(1)
-    })
+			// Also catch the finished promise rejection to prevent unhandled rejection
+			process.finished.catch(() => {}); // Swallow the rejection
 
-    it('should set listeners to stdout data events', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			// Advance timers to trigger timeout
+			vi.advanceTimersByTime(100);
 
-      process.start()
+			await expect(process.ready).rejects.toBeDefined();
+			expect(process.getStatus()).toEqual('failedByReadyCheck');
 
-      expect(process.process!.stdout!.listeners('data').length).toBeGreaterThanOrEqual(1)
-    })
+			vi.useRealTimers();
+		}, 1000);
 
-    it('should set listeners to stderr data events', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+		it('should resolve ready promise anyway after timeout if passIfNotFound is true', async () => {
+			vi.useFakeTimers();
 
-      process.start()
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[passIfNotFoundReadyCheck],
+				mockLogger,
+			);
 
-      expect(process.process!.stderr!.listeners('data').length).toBeGreaterThanOrEqual(1)
-    })
+			process.start();
 
-    it('should throw if process is already running', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			// should start as running
+			expect(process.getStatus()).toEqual('running');
 
-      process.start()
+			// Advance timers to trigger timeout with passIfNotFound
+			vi.advanceTimersByTime(100);
 
-      expect(() => process.start()).toThrow()
-    })
+			// after timeout, process should be ready
+			await expect(process.ready).resolves.toBeUndefined();
+			expect(process.getStatus()).toEqual('ready');
 
-    it('should spawn a child process when is called', () => {
-      const process = createManagedProcess('echo', ['hello'], readyChecks, mockLogger)
+			vi.useRealTimers();
+		}, 1000);
 
-      process.start()
+		it('should set to couldNotSpawn when could not spawn process', async () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[passIfNotFoundReadyCheck],
+				mockLogger,
+			);
 
-      expect(process.process).not.toBeNull()
-    })
+			process.start();
 
-    it('should resolve ready promise immediatly when no ready checks are provided', async () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+			// should start as running
+			expect(process.getStatus()).toEqual('running');
 
-      process.start()
+			// Catch the finished promise rejection to prevent unhandled rejection
+			process.finished.catch(() => {}); // Swallow the rejection
 
-      await expect(process.ready).resolves.toBeUndefined()
-      expect(process.getStatus()).toEqual('ready')
-    })
+			process.process!.emit('error', new Error('Could not spawn process'));
 
-    it('should resolve ready promise when ready check passes', async () => {
-      const process = createManagedProcess('echo', ['ready'], [simpleReadyCheck], mockLogger)
+			await expect(process.ready).rejects.toBeDefined();
+			expect(process.getStatus()).toEqual('couldNotSpawn');
+		}, 1000);
+	});
 
-      process.start()
+	describe('callbacks', () => {
+		it('calls onReady callbacks when ready resolves', async () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const readySpy = vi.fn();
+			process.onReady(readySpy);
 
-      // Allow the ready check listeners to be set up before emitting data
-      await new Promise((resolve) => setImmediate(resolve))
+			process.start();
 
-      // Emit the ready data to trigger the ready check
-      stubStdout.emit('data', 'ready')
+			await process.ready;
+			expect(readySpy).toHaveBeenCalled();
+		});
 
-      // Wait for ready promise to resolve
-      await expect(process.ready).resolves.toBeUndefined()
+		it('calls onExit callbacks when process exits', async () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const exitSpy = vi.fn();
+			process.onExit(exitSpy);
 
-      // Check status immediately after ready resolves
-      expect(process.getStatus()).toEqual('ready')
-    }, 1000)
+			process.start();
+			stubProc.emit('exit', 0);
 
-    it('should reject ready promise when ready check fails', async () => {
-      vi.useFakeTimers()
+			await expect(process.finished).resolves.toBeUndefined();
 
-      const process = createManagedProcess('echo', ['hello'], [timeoutReadyCheck], mockLogger)
+			expect(exitSpy).toHaveBeenCalled();
+		});
 
-      process.start()
+		it('calls onCrash callbacks when process crashes', async () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
+			const crashSpy = vi.fn();
+			process.onCrash(crashSpy);
 
-      // Also catch the finished promise rejection to prevent unhandled rejection
-      process.finished.catch(() => {}) // Swallow the rejection
+			process.start();
 
-      // Advance timers to trigger timeout
-      vi.advanceTimersByTime(100)
+			// Emit the error on the actual process instance before ready check completes
+			// This simulates a spawn error
+			process.process!.emit('error', new Error('Process crashed'));
 
-      await expect(process.ready).rejects.toBeDefined()
-      expect(process.getStatus()).toEqual('failedByReadyCheck')
+			// Use expect().rejects to properly handle the rejected promise
+			await expect(process.ready).rejects.toBeDefined();
 
-      vi.useRealTimers()
-    }, 1000)
+			await expect(process.finished).rejects.toBeDefined();
 
-    it('should resolve ready promise anyway after timeout if passIfNotFound is true', async () => {
-      vi.useFakeTimers()
+			expect(crashSpy).toHaveBeenCalled();
+			expect(process.getStatus()).toEqual('couldNotSpawn');
+		});
+	});
 
-      const process = createManagedProcess(
-        'echo',
-        ['hello'],
-        [passIfNotFoundReadyCheck],
-        mockLogger,
-      )
+	describe('stop()', () => {
+		it('should error if process is not running', () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      process.start()
+			expect(() => process.stop()).toThrow();
+		});
 
-      // should start as running
-      expect(process.getStatus()).toEqual('running')
+		it('should set status to stopping immediately', () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      // Advance timers to trigger timeout with passIfNotFound
-      vi.advanceTimersByTime(100)
+			process.start();
 
-      // after timeout, process should be ready
-      await expect(process.ready).resolves.toBeUndefined()
-      expect(process.getStatus()).toEqual('ready')
+			process.stop();
 
-      vi.useRealTimers()
-    }, 1000)
+			expect(process.getStatus()).toEqual('stopping');
+		});
 
-    it('should set to couldNotSpawn when could not spawn process', async () => {
-      const process = createManagedProcess(
-        'echo',
-        ['hello'],
-        [passIfNotFoundReadyCheck],
-        mockLogger,
-      )
+		it('should resolve finished promise when process is stopped', async () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      process.start()
+			process.start();
 
-      // should start as running
-      expect(process.getStatus()).toEqual('running')
+			process.stop();
+			stubProc.emit('exit', null, 'SIGINT');
 
-      // Catch the finished promise rejection to prevent unhandled rejection
-      process.finished.catch(() => {}) // Swallow the rejection
+			await expect(process.finished).resolves.toBeUndefined();
+		});
 
-      process.process!.emit('error', new Error('Could not spawn process'))
+		it('should escalate to kill if process does not exit after timeout', async () => {
+			vi.useFakeTimers();
+			const process = createManagedProcess('sleep', ['10'], [], mockLogger);
 
-      await expect(process.ready).rejects.toBeDefined()
-      expect(process.getStatus()).toEqual('couldNotSpawn')
-    }, 1000)
-  })
+			// Spy on the kill method properly
+			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+				// Mock implementation to avoid actual killing
+			});
 
-  describe('callbacks', () => {
-    it('calls onReady callbacks when ready resolves', async () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
-      const readySpy = vi.fn()
-      process.onReady(readySpy)
+			process.start();
 
-      process.start()
+			process.stop(100);
 
-      await process.ready
-      expect(readySpy).toHaveBeenCalled()
-    })
+			// Advance timers to trigger timeout
+			vi.advanceTimersByTime(101);
 
-    it('calls onExit callbacks when process exits', async () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
-      const exitSpy = vi.fn()
-      process.onExit(exitSpy)
+			expect(killSpy).toHaveBeenCalled();
 
-      process.start()
-      stubProc.emit('exit', 0)
+			vi.useRealTimers();
+		});
+	});
 
-      await expect(process.finished).resolves.toBeUndefined()
+	describe('kill()', () => {
+		it('should error if process is not running', () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      expect(exitSpy).toHaveBeenCalled()
-    })
+			expect(() => process.kill()).toThrow();
+		});
 
-    it('calls onCrash callbacks when process crashes', async () => {
-      const process = createManagedProcess('echo', ['hello'], [simpleReadyCheck], mockLogger)
-      const crashSpy = vi.fn()
-      process.onCrash(crashSpy)
+		it('should set status to crashed immediately', () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      process.start()
+			process.start();
 
-      // Emit the error on the actual process instance before ready check completes
-      // This simulates a spawn error
-      process.process!.emit('error', new Error('Process crashed'))
+			// Catch the finished promise rejection to prevent unhandled rejection
+			process.finished.catch(() => {}); // Swallow the rejection
 
-      // Use expect().rejects to properly handle the rejected promise
-      await expect(process.ready).rejects.toBeDefined()
+			process.kill();
+			stubProc.emit('exit', null, 'SIGKILL');
 
-      await expect(process.finished).rejects.toBeDefined()
+			expect(process.getStatus()).toEqual('crashed');
+		});
 
-      expect(crashSpy).toHaveBeenCalled()
-      expect(process.getStatus()).toEqual('couldNotSpawn')
-    })
-  })
+		it('should reject finished promise when process is killed', async () => {
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-  describe('stop()', () => {
-    it('should error if process is not running', () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+			process.start();
 
-      expect(() => process.stop()).toThrow()
-    })
+			process.kill();
+			stubProc.emit('exit', null, 'SIGKILL');
 
-    it('should set status to stopping immediately', () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+			await expect(process.finished).rejects.toBeDefined();
+		});
+	});
 
-      process.start()
+	describe('prepareForRestart() and restart flow', () => {
+		let firstProc: ReturnType<typeof makeStubProc>;
+		let secondProc: ReturnType<typeof makeStubProc>;
+		beforeEach(() => {
+			firstProc = makeStubProc();
+			secondProc = makeStubProc();
+		});
+		it('should throw when prepareForRestart is called while running', () => {
+			mockSpawn.mockImplementationOnce(() => firstProc.proc as any);
+			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
 
-      process.stop()
+			process.start();
 
-      expect(process.getStatus()).toEqual('stopping')
-    })
+			expect(() => process.prepareForRestart()).toThrow();
+		});
 
-    it('should resolve finished promise when process is stopped', async () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+		it('should reset state after process exits and allow start again', async () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
 
-      process.start()
+			process.start();
 
-      process.stop()
-      stubProc.emit('exit', null, 'SIGINT')
+			// Simulate normal exit
+			stubProc.emit('exit', 0);
 
-      await expect(process.finished).resolves.toBeUndefined()
-    })
+			await expect(process.finished).resolves.toBeUndefined();
 
-    it('should escalate to kill if process does not exit after timeout', async () => {
-      vi.useFakeTimers()
-      const process = createManagedProcess('sleep', ['10'], [], mockLogger)
+			// After exit, prepareForRestart should succeed
+			process.prepareForRestart();
 
-      // Spy on the kill method properly
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
-        // Mock implementation to avoid actual killing
-      })
+			expect(process.getStatus()).toEqual('created');
+			expect(process.ready).toBeInstanceOf(Promise);
+			expect(process.finished).toBeInstanceOf(Promise);
 
-      process.start()
+			// Starting again should spawn a new process
+			process.start();
 
-      process.stop(100)
+			expect(process.getStatus()).toEqual('running');
+			expect(process.process).not.toBeNull();
+		});
 
-      // Advance timers to trigger timeout
-      vi.advanceTimersByTime(101)
+		it('should allow restart after crash (couldNotSpawn/crashed)', async () => {
+			const process = createManagedProcess(
+				'echo',
+				['hello'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
 
-      expect(killSpy).toHaveBeenCalled()
+			process.start();
 
-      vi.useRealTimers()
-    })
-  })
+			// Simulate crash/error
+			process.process!.emit('error', new Error('boom'));
 
-  describe('kill()', () => {
-    it('should error if process is not running', () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+			await expect(process.ready).rejects.toBeDefined();
+			await expect(process.finished).rejects.toBeDefined();
 
-      expect(() => process.kill()).toThrow()
-    })
+			// prepareForRestart should reset the instance
+			process.prepareForRestart();
 
-    it('should set status to crashed immediately', () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
+			expect(process.getStatus()).toEqual('created');
 
-      process.start()
-
-      // Catch the finished promise rejection to prevent unhandled rejection
-      process.finished.catch(() => {}) // Swallow the rejection
-
-      process.kill()
-      stubProc.emit('exit', null, 'SIGKILL')
-
-      expect(process.getStatus()).toEqual('crashed')
-    })
-
-    it('should reject finished promise when process is killed', async () => {
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
-
-      process.start()
-
-      process.kill()
-      stubProc.emit('exit', null, 'SIGKILL')
-
-      await expect(process.finished).rejects.toBeDefined()
-    })
-  })
-
-  describe('prepareForRestart() and restart flow', () => {
-    let firstProc: ReturnType<typeof makeStubProc>
-    let secondProc: ReturnType<typeof makeStubProc>
-    beforeEach(() => {
-      firstProc = makeStubProc()
-      secondProc = makeStubProc()
-    })
-    it('should throw when prepareForRestart is called while running', () => {
-      mockSpawn.mockImplementationOnce(() => firstProc.proc as any)
-      const process = createManagedProcess('echo', ['hello'], [], mockLogger)
-
-      process.start()
-
-      expect(() => process.prepareForRestart()).toThrow()
-    })
-
-    it('should reset state after process exits and allow start again', async () => {
-      const process = createManagedProcess('echo', ['hello'], [simpleReadyCheck], mockLogger)
-
-      process.start()
-
-      // Simulate normal exit
-      stubProc.emit('exit', 0)
-
-      await expect(process.finished).resolves.toBeUndefined()
-
-      // After exit, prepareForRestart should succeed
-      process.prepareForRestart()
-
-      expect(process.getStatus()).toEqual('created')
-      expect(process.ready).toBeInstanceOf(Promise)
-      expect(process.finished).toBeInstanceOf(Promise)
-
-      // Starting again should spawn a new process
-      process.start()
-
-      expect(process.getStatus()).toEqual('running')
-      expect(process.process).not.toBeNull()
-    })
-
-    it('should allow restart after crash (couldNotSpawn/crashed)', async () => {
-      const process = createManagedProcess('echo', ['hello'], [simpleReadyCheck], mockLogger)
-
-      process.start()
-
-      // Simulate crash/error
-      process.process!.emit('error', new Error('boom'))
-
-      await expect(process.ready).rejects.toBeDefined()
-      await expect(process.finished).rejects.toBeDefined()
-
-      // prepareForRestart should reset the instance
-      process.prepareForRestart()
-
-      expect(process.getStatus()).toEqual('created')
-
-      // Starting again should succeed and spawn another process
-      process.start()
-      expect(process.getStatus()).toEqual('running')
-      expect(process.process).not.toBeNull()
-    })
-  })
-})
+			// Starting again should succeed and spawn another process
+			process.start();
+			expect(process.getStatus()).toEqual('running');
+			expect(process.process).not.toBeNull();
+		});
+	});
+});

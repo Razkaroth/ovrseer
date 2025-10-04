@@ -25,15 +25,11 @@ type InkTUIRendererProps = {
 export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	processes,
 	state,
+	statusMessage = 'Ready',
+	logsData = null,
 	onKeyPress,
 }) => {
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	const [status, setStatus] = useState('Ready');
-	const [logs, setLogs] = useState<{
-		id: string;
-		type: TUIProcessType;
-		content: string;
-	} | null>(null);
 	const {exit} = useApp();
 
 	const processItems: ProcessItem[] = [];
@@ -176,12 +172,12 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					padding={1}
 				>
 					<Text bold>Logs</Text>
-					{logs ? (
+					{logsData ? (
 						<Box flexDirection="column">
 							<Text bold color="yellow">
-								{logs.type}:{logs.id}
+								{logsData.type}:{logsData.id}
 							</Text>
-							<Text>{logs.content}</Text>
+							<Text>{logsData.content}</Text>
 						</Box>
 					) : (
 						<Text dimColor>Press Enter to view logs for selected process</Text>
@@ -197,7 +193,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					</Text>
 				</Box>
 				<Box padding={1}>
-					<Text backgroundColor="blue">{status}</Text>
+					<Text backgroundColor="blue">{statusMessage}</Text>
 				</Box>
 			</Box>
 		</Box>
