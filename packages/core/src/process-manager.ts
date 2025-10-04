@@ -134,18 +134,6 @@ export class ProcessManager implements ProcessManagerI {
 				.map(proc => proc.finished.catch(() => { })),
 		);
 
-		for (const dep of dependencies) {
-			if (dep.isRunning()) {
-				dep.stop();
-			}
-		}
-
-		await Promise.allSettled(
-			dependencies
-				.filter(dep => dep.isRunning() || dep.getStatus() === 'stopping')
-				.map(dep => dep.finished.catch(() => { })),
-		);
-
 		this.tui?.showStatus?.('Running cleanup processes...');
 		for (const id of this.cleanupOrder) {
 			const cleanup = this.cleanupProcesses.get(id);
@@ -172,6 +160,20 @@ export class ProcessManager implements ProcessManagerI {
 				);
 			}
 		}
+
+
+		for (const dep of dependencies) {
+			if (dep.isRunning()) {
+				dep.stop();
+			}
+		}
+
+		await Promise.allSettled(
+			dependencies
+				.filter(dep => dep.isRunning() || dep.getStatus() === 'stopping')
+				.map(dep => dep.finished.catch(() => { })),
+		);
+
 		this.tui?.showStatus?.('Cleanup finished');
 		this.updateTui();
 	}
@@ -211,105 +213,42 @@ export class ProcessManager implements ProcessManagerI {
 			return;
 		}
 
-		this.tui?.showStatus?.('Restarting all (stopping processes)...');
-
 		const prevSelectedId = this.tuiState.selectedProcessId;
 		const prevSelectedType = this.tuiState.selectedProcessType;
 
-		const runningDeps: Array<[string, ManagedProcessI]> = [];
-		const runningMain: Array<[string, ManagedProcessI]> = [];
-
-		for (const entry of this.dependencies)
-			if (entry[1].isRunning()) runningDeps.push(entry);
-		for (const entry of this.mainProcesses)
-			if (entry[1].isRunning()) runningMain.push(entry);
-
 		(async () => {
-			for (const [, proc] of runningMain) {
+			this.tui?.showStatus?.('Restarting all (stopping processes)...');
+			await this.stop();
+
+			this.tui?.showStatus?.('Restarting all (preparing for restart)...');
+			for (const proc of this.dependencies.values()) {
 				try {
-					proc.stop();
+					proc.prepareForRestart?.();
 				} catch {
 					/* ignore */
 				}
 			}
 
-			await Promise.allSettled(
-				runningMain.map(([, proc]) => proc.finished.catch(() => { })),
-			);
-
-			for (const [, proc] of runningDeps) {
+			for (const proc of this.mainProcesses.values()) {
 				try {
-					proc.stop();
+					proc.prepareForRestart?.();
+				} catch {
+					/* ignore */
+				}
+			}
+			for (const proc of this.cleanupProcesses.values()) {
+				try {
+					proc.prepareForRestart?.();
 				} catch {
 					/* ignore */
 				}
 			}
 
-			await Promise.allSettled(
-				runningDeps.map(([, dep]) => dep.finished.catch(() => { })),
-			);
-
-			this.tui?.showStatus?.('Running cleanup processes...');
-			for (const [id, cleanup] of this.cleanupProcesses) {
-				try {
-					cleanup.start();
-				} catch (_) {
-					/* ignore */
-				}
-				try {
-					await this.waitForPromiseWithTimeout(
-						cleanup.finished,
-						this.cleanupTimeout,
-						id,
-					);
-				} catch (e: any) {
-					this.tui?.showStatus?.(
-						`Cleanup ${id} timeout: ${e?.message || 'timeout'}`,
-					);
-				}
-				try {
-					cleanup.cleanup();
-				} catch (_) {
-					/* ignore */
-				}
-			}
-
-			this.updateTui();
 			this.tui?.showStatus?.('Restarting all (starting dependencies)...');
-
-			for (const [id, dep] of runningDeps) {
-				try {
-					dep.prepareForRestart?.();
-				} catch {
-					/* ignore */
-				}
-				this.setupProcessHandlers(id, dep, 'dependency');
-				dep.start();
-			}
-
-			if (runningDeps.length) {
-				try {
-					await Promise.all(runningDeps.map(([, d]) => d.ready));
-				} catch (e: any) {
-					this.tui?.showStatus?.(
-						`Dependency failed after restart: ${e?.message || e}`,
-					);
-					return;
-				}
-			}
-
+			this.start();
 			this.tui?.showStatus?.('Restarting all (starting main)...');
-			for (const [id, mp] of runningMain) {
-				try {
-					mp.prepareForRestart?.();
-				} catch {
-					/* ignore */
-				}
-				this.setupProcessHandlers(id, mp, 'main');
-				mp.start();
-			}
 
-			this.updateTui();
+			await new Promise(resolve => setTimeout(resolve, 0));
 			this.tui?.showStatus?.('All processes restarted');
 
 			if (prevSelectedId && prevSelectedType) {
