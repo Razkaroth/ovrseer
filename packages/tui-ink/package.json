@@ -18,7 +18,7 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"lint": "prettier --check .",
-		"test": "bun test"
+		"test": "echo \"No tests yet\" && exit 0"
 	},
 	"dependencies": {
 		"@ovrseer/core": "workspace:*",

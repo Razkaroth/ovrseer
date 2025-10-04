@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from 'ink';
+import {render, type Instance} from 'ink';
 import type {
 	TUIRendererI,
 	ProcessMap,
@@ -10,7 +10,7 @@ import type {
 import {InkTUIRenderer} from './InkTUIRenderer.js';
 
 export class InkTUIWrapper implements TUIRendererI {
-	private renderInstance: any = null;
+	private renderInstance: Instance | null = null;
 	private keyPressCallback?: (key: string, meta?: TUIKeyPressMeta) => void;
 	private currentProcesses: ProcessMap = {
 		dependencies: new Map(),
