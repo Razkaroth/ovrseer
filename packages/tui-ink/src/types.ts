@@ -51,12 +51,47 @@ type getLogsParams = {
 	separator?: string;
 };
 
+export type FlagColor =
+	| 'green'
+	| 'blue'
+	| 'red'
+	| 'yellow'
+	| 'teal'
+	| 'purple'
+	| 'orange';
+
+export interface FlagMatch {
+	logIndex: number;
+	matchedText: string;
+	timestamp: number;
+	contextWindow: string[];
+}
+
+export interface Flag {
+	pattern: RegExp | string;
+	color: FlagColor;
+	targetCount?: number;
+	contextWindowSize?: number;
+}
+
+export interface FlagState {
+	flag: Flag;
+	count: number;
+	matches: FlagMatch[];
+}
+
 export interface ProcessLoggerI {
-	onLog(listener: (chunk: string) => void): () => void; // returns unsubscribe
-	onError(listener: (chunk: string) => void): () => void; // returns unsubscribe
+	onLog(listener: (chunk: string) => void): () => void;
+	onError(listener: (chunk: string) => void): () => void;
 	getLogs(options?: getLogsParams): string;
 	addChunk(chunk: string, isError?: boolean): void;
 	reset(): void;
+
+	addFlag(name: string, flag: Flag): void;
+	removeFlag(name: string): void;
+	getFlag(name: string): FlagState | undefined;
+	getAllFlags(): Map<string, FlagState>;
+	clearFlags(): void;
 }
 
 export interface ReadyCheck {
@@ -205,12 +240,24 @@ export type ProcessMap = {
 	cleanup: Map<string, ProcessUnitI>;
 };
 
+export type FlagPanelSize = 'collapsed' | 'expanded';
+
+export type FlagTreeNode = {
+	type: 'root' | 'flag' | 'match';
+	id: string;
+	expanded?: boolean;
+};
+
 export interface TUIState {
 	selectedProcessId?: string | null;
 	selectedProcessType?: TUIProcessType;
 	showHelp?: boolean;
 	logScrollOffset?: number;
 	filter?: string;
+	flagPanelSize?: FlagPanelSize;
+	flagPanelFocused?: boolean;
+	selectedFlagNode?: string;
+	expandedFlagNodes?: Set<string>;
 }
 
 export interface TUIKeyPressMeta {

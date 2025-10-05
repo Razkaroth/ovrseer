@@ -6,6 +6,7 @@ import type {
 	TUIProcessType,
 	TUIKeyPressMeta,
 	ProcessUnitI,
+	FlagState,
 } from './types.js';
 
 type ProcessItem = {
@@ -20,6 +21,50 @@ type InkTUIRendererProps = {
 	statusMessage?: string;
 	logsData?: {id: string; type: TUIProcessType; content: string} | null;
 	onKeyPress?: (key: string, meta?: TUIKeyPressMeta) => void;
+};
+
+const getFlagColorCode = (
+	color: string,
+): 'green' | 'blue' | 'red' | 'yellow' | 'cyan' | 'magenta' | 'gray' => {
+	switch (color) {
+		case 'green':
+			return 'green';
+		case 'blue':
+			return 'blue';
+		case 'red':
+			return 'red';
+		case 'yellow':
+			return 'yellow';
+		case 'teal':
+			return 'cyan';
+		case 'purple':
+			return 'magenta';
+		case 'orange':
+			return 'yellow';
+		default:
+			return 'gray';
+	}
+};
+
+const getFlagEmoji = (color: string): string => {
+	switch (color) {
+		case 'red':
+			return '🔴';
+		case 'yellow':
+			return '🟡';
+		case 'green':
+			return '🟢';
+		case 'blue':
+			return '🔵';
+		case 'teal':
+			return '🟦';
+		case 'purple':
+			return '🟣';
+		case 'orange':
+			return '🟠';
+		default:
+			return '⚑';
+	}
 };
 
 const getStatusIcon = (status: string): string => {
@@ -212,13 +257,17 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					}
 				}
 			} else if (key.return) {
-				if (processItems[selectedIndex]) {
+				if (state.flagPanelFocused) {
+					onKeyPress('flag-enter');
+				} else if (processItems[selectedIndex]) {
 					const item = processItems[selectedIndex];
 					onKeyPress('enter', {processInfo: {id: item.id, type: item.type}});
 					setLogScrollOffset(0);
 				}
 			} else if (key.upArrow || input === 'k') {
-				if (logsData) {
+				if (state.flagPanelFocused) {
+					onKeyPress('flag-up');
+				} else if (logsData) {
 					if (currentProcessKey && isTailing) {
 						setTailingMap(prev => {
 							const newMap = new Map(prev);
@@ -229,7 +278,9 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					setLogScrollOffset(Math.max(0, logScrollOffset - 1));
 				}
 			} else if (key.downArrow || input === 'j') {
-				if (logsData) {
+				if (state.flagPanelFocused) {
+					onKeyPress('flag-down');
+				} else if (logsData) {
 					if (currentProcessKey && isTailing) {
 						setTailingMap(prev => {
 							const newMap = new Map(prev);
@@ -247,11 +298,23 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 			} else if ((key.ctrl && key.upArrow) || input === 'K') {
 				const newIndex = Math.max(0, selectedIndex - 1);
 				setSelectedIndex(newIndex);
-				onKeyPress('up');
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
 			} else if ((key.ctrl && key.downArrow) || input === 'J') {
 				const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
 				setSelectedIndex(newIndex);
-				onKeyPress('down');
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
 			} else if (key.pageUp && logsData) {
 				if (currentProcessKey && isTailing) {
 					setTailingMap(prev => {
@@ -275,6 +338,14 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						logScrollOffset + maxLogLines,
 					),
 				);
+			} else if (input === 'f') {
+				onKeyPress('f');
+			} else if (input === 'm') {
+				onKeyPress('m');
+			} else if (input === 'n') {
+				onKeyPress('n');
+			} else if (input === 'p') {
+				onKeyPress('p');
 			}
 		},
 		{isActive: true},
@@ -303,6 +374,16 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					const icon = getStatusIcon(status);
 					const color = getStatusColor(status);
 
+					const logger = item.process.logger;
+					const allFlags = logger.getAllFlags();
+					const flagsWithCounts = Array.from(allFlags.values())
+						.map((flagState: FlagState) => ({
+							color: flagState.flag.color,
+							count: flagState.count,
+						}))
+						.sort((a, b) => b.count - a.count)
+						.slice(0, 3);
+
 					return (
 						<Box key={item.id}>
 							<Text
@@ -311,6 +392,14 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 							>
 								<Text color={color}>{`  ${icon}`}</Text>
 								{` ${item.id} `}
+								{flagsWithCounts.map((f, i) =>
+									f.count > 0 ? (
+										<Text key={i} color={getFlagColorCode(f.color)}>
+											{getFlagEmoji(f.color)}
+											<Text>{f.count} </Text>
+										</Text>
+									) : null,
+								)}
 								<Text dimColor>[{status}]</Text>
 							</Text>
 						</Box>
@@ -357,51 +446,155 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					width="70%"
 					borderStyle="single"
 					borderColor="cyan"
-					paddingX={1}
 				>
-					<Box>
-						<Text bold underline>
-							Logs
-						</Text>
-						{scrollInfo && (
-							<Text dimColor color="cyan">
-								{scrollInfo}
+					<Box
+						flexDirection="column"
+						flexGrow={state.flagPanelSize === 'expanded' ? 0 : 1}
+						height={state.flagPanelSize === 'expanded' ? '20%' : undefined}
+						paddingX={1}
+						borderStyle="single"
+						borderColor="cyan"
+					>
+						<Box>
+							<Text bold underline>
+								Logs
 							</Text>
-						)}
-					</Box>
-					<Box flexDirection="column" flexGrow={1} overflow="hidden">
-						{logsData ? (
-							<Box flexDirection="column">
-								<Text bold color="yellow">
-									{logsData.type}:{logsData.id}
+							{scrollInfo && (
+								<Text dimColor color="cyan">
+									{' '}
+									{scrollInfo}
 								</Text>
-								<Box flexDirection="column" marginTop={1}>
-									{visibleLogLines.map((line, idx) => {
-										const actualLineNumber = logScrollOffset + idx + 1;
-										return (
-											<Text key={actualLineNumber}>
-												<Text dimColor>
-													{String(actualLineNumber).padStart(4, ' ')}│
+							)}
+						</Box>
+						<Box flexDirection="column" flexGrow={1} overflow="hidden">
+							{logsData ? (
+								<Box flexDirection="column" flexGrow={1}>
+									<Text bold color="yellow">
+										{logsData.type}:{logsData.id}
+									</Text>
+									<Box flexDirection="column" marginTop={1} flexGrow={1}>
+										{visibleLogLines.map((line, idx) => {
+											const actualLineNumber = logScrollOffset + idx + 1;
+											return (
+												<Text key={actualLineNumber}>
+													<Text dimColor>
+														{String(actualLineNumber).padStart(4, ' ')}│
+													</Text>
+													{line}
 												</Text>
-												{line}
-											</Text>
-										);
-									})}
-								</Box>
-								{logLines.length > maxLogLines && (
-									<Box marginTop={1}>
-										<Text dimColor>
-											j/k/↑/↓ scroll line | PgUp/PgDn scroll page | t toggle
-											tail {isTailing && '(tailing ↓)'}
-										</Text>
+											);
+										})}
 									</Box>
-								)}
-							</Box>
-						) : (
-							<Text dimColor>
-								Press Enter to view logs for selected process
-							</Text>
-						)}
+									{logLines.length > maxLogLines && (
+										<Box>
+											<Text dimColor>
+												j/k/↑/↓ scroll line | PgUp/PgDn scroll page | t toggle
+												tail {isTailing && '(tailing ↓)'}
+											</Text>
+										</Box>
+									)}
+								</Box>
+							) : (
+								<Text dimColor>
+									Press Enter to view logs for selected process
+								</Text>
+							)}
+						</Box>
+					</Box>
+
+					<Box
+						flexDirection="column"
+						flexGrow={state.flagPanelSize === 'expanded' ? 1 : 0}
+						height={state.flagPanelSize === 'expanded' ? undefined : '20%'}
+						borderStyle="single"
+						borderColor={state.flagPanelFocused ? 'yellow' : 'magenta'}
+						paddingX={1}
+					>
+						{(() => {
+							const selectedItem = processItems.find(
+								item =>
+									item.id === state.selectedProcessId &&
+									item.type === state.selectedProcessType,
+							);
+							if (!selectedItem) {
+								return <Text dimColor>No process selected</Text>;
+							}
+
+							const logger = selectedItem.process.logger;
+							const allFlags = logger.getAllFlags();
+
+							if (allFlags.size === 0) {
+								return <Text dimColor>No flags for this process</Text>;
+							}
+
+							const renderFlagTree = () => {
+								const items: JSX.Element[] = [];
+								Array.from(allFlags.entries()).forEach(([name, flagState]) => {
+									const flagNodeId = `flag:${name}`;
+									const isSelected = state.selectedFlagNode === flagNodeId;
+									const isExpanded = state.expandedFlagNodes?.has(flagNodeId);
+									items.push(
+										<Box key={flagNodeId}>
+											<Text
+												bold={isSelected}
+												inverse={isSelected}
+												color={
+													isSelected
+														? 'black'
+														: getFlagColorCode(flagState.flag.color)
+												}
+												backgroundColor={
+													isSelected
+														? getFlagColorCode(flagState.flag.color)
+														: undefined
+												}
+											>
+												{isExpanded ? '▼' : '▶'}{' '}
+												{getFlagEmoji(flagState.flag.color)} {name}:{' '}
+												{String(flagState.count)}
+												{flagState.flag.targetCount &&
+													`/${String(flagState.flag.targetCount)}`}
+											</Text>
+										</Box>,
+									);
+									if (isExpanded && flagState.matches) {
+										flagState.matches.forEach((match, idx) => {
+											const matchNodeId = `${flagNodeId}:match:${idx}`;
+											const isMatchSelected =
+												state.selectedFlagNode === matchNodeId;
+											items.push(
+												<Box key={matchNodeId} paddingLeft={2}>
+													<Text
+														bold={isMatchSelected}
+														inverse={isMatchSelected}
+														color={isMatchSelected ? 'black' : 'gray'}
+														backgroundColor={
+															isMatchSelected ? 'cyan' : undefined
+														}
+													>
+														• Match {String(idx + 1)}:{' '}
+														{match.matchedText.substring(0, 60)}
+														{match.matchedText.length > 60 ? '...' : ''}
+													</Text>
+												</Box>,
+											);
+										});
+									}
+								});
+								return items;
+							};
+							return (
+								<Box flexDirection="column" overflow="hidden">
+									<Text bold>
+										Flags{' '}
+										{state.flagPanelSize === 'expanded'
+											? '(press f to collapse, ↑/↓ to navigate, enter to expand)'
+											: '(press f to expand)'}
+									</Text>
+									{renderFlagTree()}
+								</Box>
+							);
+						})()}
 					</Box>
 				</Box>
 			</Box>
@@ -410,7 +603,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				<Box borderStyle="single" borderColor="gray" paddingX={1}>
 					<Text dimColor>
 						J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail | enter
-						logs | r restart | R/C-r restart all | q quit
+						logs | f toggle flags | r restart | R/C-r restart all | q quit
 					</Text>
 				</Box>
 				<Box borderStyle="single" borderColor="cyan" paddingX={1}>

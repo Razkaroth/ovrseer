@@ -183,7 +183,9 @@ export class InkTUI extends InkTUIWrapper {
 					this.manager.restartAll();
 				}
 			} else if (key === 'enter') {
-				if (
+				if (this.managedState.flagPanelFocused) {
+					this.toggleFlagNodeExpansion();
+				} else if (
 					this.managedState.selectedProcessId &&
 					this.managedState.selectedProcessType
 				) {
@@ -203,16 +205,21 @@ export class InkTUI extends InkTUIWrapper {
 						);
 					}
 				}
-			} else if (key === 'up') {
-				this.selectPrevious();
-			} else if (key === 'down') {
-				this.selectNext();
 			} else if (key === 'select') {
 				if (meta?.processInfo) {
 					this.managedState.selectedProcessId = meta.processInfo.id;
 					this.managedState.selectedProcessType = meta.processInfo.type;
+					this.resetFlagPanel();
 					this.render(this.managedProcesses, this.managedState);
 				}
+			} else if (key === 'f') {
+				this.toggleFlagPanelSize();
+			} else if (key === 'flag-up') {
+				this.moveFlagSelectionUp();
+			} else if (key === 'flag-down') {
+				this.moveFlagSelectionDown();
+			} else if (key === 'flag-enter') {
+				this.toggleFlagNodeExpansion();
 			}
 		});
 	}
@@ -229,5 +236,117 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'main') return this.managedProcesses.main.get(id);
 		if (type === 'cleanup') return this.managedProcesses.cleanup.get(id);
 		return undefined;
+	}
+
+	private resetFlagPanel(): void {
+		this.managedState.flagPanelSize = 'collapsed';
+		this.managedState.flagPanelFocused = false;
+		this.managedState.selectedFlagNode = undefined;
+		this.managedState.expandedFlagNodes = new Set();
+		this.render(this.managedProcesses, this.managedState);
+	}
+
+	private toggleFlagPanelSize(): void {
+		if (!this.managedState.flagPanelSize) {
+			this.managedState.flagPanelSize = 'collapsed';
+		}
+		if (this.managedState.flagPanelSize === 'collapsed') {
+			this.managedState.flagPanelSize = 'expanded';
+			this.managedState.flagPanelFocused = true;
+			const flatTree = this.buildFlatFlagTree();
+			if (flatTree.length > 0 && !this.managedState.selectedFlagNode) {
+				this.managedState.selectedFlagNode = flatTree[0];
+			}
+		} else {
+			this.managedState.flagPanelSize = 'collapsed';
+			this.managedState.flagPanelFocused = false;
+		}
+		this.render(this.managedProcesses, this.managedState);
+	}
+
+	private buildFlatFlagTree(): string[] {
+		if (
+			!this.managedState.selectedProcessId ||
+			!this.managedState.selectedProcessType
+		)
+			return [];
+		const proc = this.getProcessByIdAndType(
+			this.managedState.selectedProcessId,
+			this.managedState.selectedProcessType,
+		);
+		if (!proc) return [];
+		const allFlags = proc.logger.getAllFlags();
+		if (!allFlags || allFlags.size === 0) return [];
+		const flatList: string[] = [];
+		for (const [flagName, flagState] of allFlags.entries()) {
+			flatList.push(`flag:${flagName}`);
+			if (
+				this.managedState.expandedFlagNodes?.has(`flag:${flagName}`) &&
+				flagState.matches &&
+				flagState.matches.length > 0
+			) {
+				for (let i = 0; i < flagState.matches.length; i++) {
+					flatList.push(`flag:${flagName}:match:${i}`);
+				}
+			}
+		}
+		return flatList;
+	}
+
+	private moveFlagSelectionUp(): void {
+		if (!this.managedState.flagPanelFocused) return;
+		const flatTree = this.buildFlatFlagTree();
+		if (flatTree.length === 0) return;
+		if (!this.managedState.selectedFlagNode) {
+			this.managedState.selectedFlagNode = flatTree[flatTree.length - 1];
+		} else {
+			const currentIndex = flatTree.indexOf(this.managedState.selectedFlagNode);
+			if (currentIndex > 0) {
+				this.managedState.selectedFlagNode = flatTree[currentIndex - 1];
+			} else {
+				this.managedState.selectedFlagNode = flatTree[flatTree.length - 1];
+			}
+		}
+		this.render(this.managedProcesses, this.managedState);
+	}
+
+	private moveFlagSelectionDown(): void {
+		if (!this.managedState.flagPanelFocused) return;
+		const flatTree = this.buildFlatFlagTree();
+		if (flatTree.length === 0) return;
+		if (!this.managedState.selectedFlagNode) {
+			this.managedState.selectedFlagNode = flatTree[0];
+		} else {
+			const currentIndex = flatTree.indexOf(this.managedState.selectedFlagNode);
+			if (currentIndex >= 0 && currentIndex < flatTree.length - 1) {
+				this.managedState.selectedFlagNode = flatTree[currentIndex + 1];
+			} else {
+				this.managedState.selectedFlagNode = flatTree[0];
+			}
+		}
+		this.render(this.managedProcesses, this.managedState);
+	}
+
+	private toggleFlagNodeExpansion(): void {
+		if (!this.managedState.flagPanelFocused) return;
+		if (!this.managedState.selectedFlagNode) {
+			const flatTree = this.buildFlatFlagTree();
+			if (flatTree.length > 0) {
+				this.managedState.selectedFlagNode = flatTree[0];
+			}
+			return;
+		}
+		if (!this.managedState.expandedFlagNodes) {
+			this.managedState.expandedFlagNodes = new Set();
+		}
+		const node = this.managedState.selectedFlagNode;
+		if (node.startsWith('flag:') && !node.includes(':match:')) {
+			if (this.managedState.expandedFlagNodes.has(node)) {
+				this.managedState.expandedFlagNodes.delete(node);
+			} else {
+				this.managedState.expandedFlagNodes.add(node);
+			}
+		}
+		this.render(this.managedProcesses, this.managedState);
 	}
 }

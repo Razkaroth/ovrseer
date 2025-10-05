@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import {ProcessLoggerI} from './types.js';
+import {ProcessLoggerI, Flag, FlagState, FlagMatch} from './types.js';
 
 export class ProcessLogger implements ProcessLoggerI {
 	private _buffer: string[] = [];
@@ -8,6 +8,7 @@ export class ProcessLogger implements ProcessLoggerI {
 	private _maxBufferSize: number;
 	private _defaultSeparator: string;
 	private _eventEmitter: EventEmitter;
+	private _flags: Map<string, FlagState> = new Map();
 
 	get _bufferSize() {
 		return this._buffer.length;
@@ -46,9 +47,13 @@ export class ProcessLogger implements ProcessLoggerI {
 
 	public addChunk(chunk: string, isError?: boolean) {
 		this._buffer.push(chunk);
+		const logIndex = this._buffer.length - 1;
 		if (this._buffer.length > this._maxBufferSize) {
 			this._buffer.shift();
 		}
+
+		this._checkFlags(chunk, logIndex);
+
 		if (isError) {
 			this._errorBuffer.push(chunk);
 			if (this._errorBuffer.length > this._maxBufferSize) {
@@ -123,5 +128,68 @@ export class ProcessLogger implements ProcessLoggerI {
 	public reset() {
 		this._buffer = [];
 		this._errorBuffer = [];
+		this._flags.clear();
+	}
+
+	public addFlag(name: string, flag: Flag) {
+		this._flags.set(name, {
+			flag,
+			count: 0,
+			matches: [],
+		});
+	}
+
+	public removeFlag(name: string) {
+		this._flags.delete(name);
+	}
+
+	public getFlag(name: string): FlagState | undefined {
+		return this._flags.get(name);
+	}
+
+	public getAllFlags(): Map<string, FlagState> {
+		return this._flags;
+	}
+
+	public clearFlags() {
+		this._flags.clear();
+	}
+
+	private _checkFlags(chunk: string, logIndex: number) {
+		for (const [_name, flagState] of this._flags) {
+			const pattern =
+				typeof flagState.flag.pattern === 'string'
+					? new RegExp(flagState.flag.pattern)
+					: flagState.flag.pattern;
+
+			if (pattern.test(chunk)) {
+				const contextWindow = this._getContextWindow(
+					logIndex,
+					flagState.flag.contextWindowSize || 5,
+				);
+
+				const match: FlagMatch = {
+					logIndex,
+					matchedText: chunk,
+					timestamp: Date.now(),
+					contextWindow,
+				};
+
+				flagState.count++;
+				flagState.matches.push(match);
+			}
+		}
+	}
+
+	private _getContextWindow(logIndex: number, windowSize: number): string[] {
+		const halfWindow = Math.floor(windowSize / 2);
+		const start = Math.max(0, logIndex - halfWindow);
+		const end = Math.min(this._buffer.length, logIndex + halfWindow + 1);
+
+		const contextLogs: string[] = [];
+		for (let i = start; i < end; i++) {
+			contextLogs.push(this._buffer[i]);
+		}
+		return contextLogs;
 	}
 }

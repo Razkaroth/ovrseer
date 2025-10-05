@@ -148,5 +148,155 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				expect(errorConsumer).toHaveBeenCalledWith('test');
 			});
 		});
+
+		describe('Flag tracking', () => {
+			it('Should add and track flags', () => {
+				loggerInstance.addFlag('error-flag', {
+					pattern: /ERROR/,
+					color: 'red',
+				});
+
+				const flag = loggerInstance.getFlag('error-flag');
+				expect(flag).toBeDefined();
+				expect(flag?.count).toBe(0);
+				expect(flag?.matches).toEqual([]);
+			});
+
+			it('Should increment count when flag pattern matches', () => {
+				loggerInstance.addFlag('error-flag', {
+					pattern: /ERROR/,
+					color: 'red',
+				});
+
+				loggerInstance.addChunk('This is an ERROR log');
+				loggerInstance.addChunk('Normal log');
+				loggerInstance.addChunk('Another ERROR here');
+
+				const flag = loggerInstance.getFlag('error-flag');
+				expect(flag?.count).toBe(2);
+				expect(flag?.matches.length).toBe(2);
+			});
+
+			it('Should capture context window around matched logs', () => {
+				loggerInstance.addFlag('warning-flag', {
+					pattern: 'WARN',
+					color: 'yellow',
+					contextWindowSize: 3,
+				});
+
+				loggerInstance.addChunk('log1');
+				loggerInstance.addChunk('log2');
+				loggerInstance.addChunk('WARN: something happened');
+				loggerInstance.addChunk('log4');
+				loggerInstance.addChunk('log5');
+
+				const flag = loggerInstance.getFlag('warning-flag');
+				expect(flag?.matches[0]?.contextWindow).toEqual([
+					'log2',
+					'WARN: something happened',
+				]);
+			});
+
+			it('Should handle context window at buffer boundaries', () => {
+				loggerInstance.addFlag('test-flag', {
+					pattern: 'TEST',
+					color: 'blue',
+					contextWindowSize: 5,
+				});
+
+				loggerInstance.addChunk('TEST at start');
+
+				const flag = loggerInstance.getFlag('test-flag');
+				expect(flag?.matches[0]?.contextWindow).toEqual(['TEST at start']);
+			});
+
+			it('Should remove flag', () => {
+				loggerInstance.addFlag('temp-flag', {
+					pattern: 'temp',
+					color: 'green',
+				});
+
+				expect(loggerInstance.getFlag('temp-flag')).toBeDefined();
+
+				loggerInstance.removeFlag('temp-flag');
+
+				expect(loggerInstance.getFlag('temp-flag')).toBeUndefined();
+			});
+
+			it('Should track multiple flags simultaneously', () => {
+				loggerInstance.addFlag('error-flag', {
+					pattern: /ERROR/,
+					color: 'red',
+				});
+				loggerInstance.addFlag('success-flag', {
+					pattern: /SUCCESS/,
+					color: 'green',
+				});
+
+				loggerInstance.addChunk('ERROR occurred');
+				loggerInstance.addChunk('SUCCESS!');
+				loggerInstance.addChunk('Another ERROR');
+
+				const errorFlag = loggerInstance.getFlag('error-flag');
+				const successFlag = loggerInstance.getFlag('success-flag');
+
+				expect(errorFlag?.count).toBe(2);
+				expect(successFlag?.count).toBe(1);
+			});
+
+			it('Should clear all flags', () => {
+				loggerInstance.addFlag('flag1', {pattern: 'test', color: 'red'});
+				loggerInstance.addFlag('flag2', {pattern: 'test', color: 'blue'});
+
+				expect(loggerInstance.getAllFlags().size).toBe(2);
+
+				loggerInstance.clearFlags();
+
+				expect(loggerInstance.getAllFlags().size).toBe(0);
+			});
+
+			it('Should store match timestamp and log index', () => {
+				const before = Date.now();
+
+				loggerInstance.addFlag('test-flag', {
+					pattern: 'MATCH',
+					color: 'teal',
+				});
+
+				loggerInstance.addChunk('MATCH found');
+
+				const after = Date.now();
+				const flag = loggerInstance.getFlag('test-flag');
+				const match = flag?.matches[0];
+
+				expect(match?.logIndex).toBe(0);
+				expect(match?.timestamp).toBeGreaterThanOrEqual(before);
+				expect(match?.timestamp).toBeLessThanOrEqual(after);
+				expect(match?.matchedText).toBe('MATCH found');
+			});
+
+			it('Should work with string patterns', () => {
+				loggerInstance.addFlag('string-flag', {
+					pattern: 'simple string',
+					color: 'purple',
+				});
+
+				loggerInstance.addChunk('This has simple string in it');
+
+				const flag = loggerInstance.getFlag('string-flag');
+				expect(flag?.count).toBe(1);
+			});
+
+			it('Should support targetCount in flag definition', () => {
+				loggerInstance.addFlag('target-flag', {
+					pattern: 'TARGET',
+					color: 'orange',
+					targetCount: 5,
+				});
+
+				const flag = loggerInstance.getFlag('target-flag');
+				expect(flag?.flag.targetCount).toBe(5);
+			});
+		});
 	},
 );
