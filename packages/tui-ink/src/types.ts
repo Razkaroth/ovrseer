@@ -65,6 +65,53 @@ export interface ReadyCheck {
 	passIfNotFound?: boolean; // for a  process that only needs some time to start and doesn't log anything
 }
 
+export type ProcessManagerEvents = {
+	'manager:started': {timestamp: number};
+	'manager:stopping': {timestamp: number};
+	'manager:stopped': {timestamp: number};
+	'manager:restarting': {timestamp: number};
+
+	'process:added': {id: string; type: TUIProcessType; timestamp: number};
+	'process:removed': {id: string; type: TUIProcessType; timestamp: number};
+	'process:started': {id: string; type: TUIProcessType; timestamp: number};
+	'process:stopping': {id: string; type: TUIProcessType; timestamp: number};
+	'process:stopped': {
+		id: string;
+		type: TUIProcessType;
+		code: number | null;
+		signal: NodeJS.Signals | null;
+		timestamp: number;
+	};
+	'process:ready': {id: string; type: TUIProcessType; timestamp: number};
+	'process:crashed': {
+		id: string;
+		type: TUIProcessType;
+		error: Error;
+		retryCount?: number;
+		timestamp: number;
+	};
+	'process:restarting': {id: string; type: TUIProcessType; timestamp: number};
+
+	'status:message': {message: string; timestamp: number};
+	'dependency:failed': {id: string; error: Error; timestamp: number};
+	'cleanup:started': {timestamp: number};
+	'cleanup:finished': {timestamp: number};
+	'cleanup:timeout': {id: string; error: Error; timestamp: number};
+
+	'state:update': {
+		processes: ProcessMap;
+		timestamp: number;
+	};
+
+	'process:log': {
+		id: string;
+		type: TUIProcessType;
+		message: string;
+		isError: boolean;
+		timestamp: number;
+	};
+};
+
 export interface ProcessManagerI {
 	addDependency(id: string, process: ManagedProcessI): void;
 	removeDependency(id: string): void;
@@ -88,6 +135,23 @@ export interface ProcessManagerI {
 
 	readonly crashReporter?: CrashReporterI;
 	readonly tui?: TUIRendererI;
+
+	on<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	addEventListener<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	off<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	removeEventListener<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
 }
 
 // --- Crash reporting types ---

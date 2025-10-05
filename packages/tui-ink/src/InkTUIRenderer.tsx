@@ -247,23 +247,11 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 			} else if ((key.ctrl && key.upArrow) || input === 'K') {
 				const newIndex = Math.max(0, selectedIndex - 1);
 				setSelectedIndex(newIndex);
-				if (processItems[newIndex]) {
-					const item = processItems[newIndex];
-					onKeyPress('select', {
-						index: newIndex,
-						processInfo: {id: item.id, type: item.type},
-					});
-				}
+				onKeyPress('up');
 			} else if ((key.ctrl && key.downArrow) || input === 'J') {
 				const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
 				setSelectedIndex(newIndex);
-				if (processItems[newIndex]) {
-					const item = processItems[newIndex];
-					onKeyPress('select', {
-						index: newIndex,
-						processInfo: {id: item.id, type: item.type},
-					});
-				}
+				onKeyPress('down');
 			} else if (key.pageUp && logsData) {
 				if (currentProcessKey && isTailing) {
 					setTailingMap(prev => {
