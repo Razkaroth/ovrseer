@@ -177,7 +177,7 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				expect(flag?.matches.length).toBe(2);
 			});
 
-			it('Should capture context window around matched logs', () => {
+			it('Should store context window size in match', () => {
 				loggerInstance.addFlag('warning-flag', {
 					pattern: 'WARN',
 					color: 'yellow',
@@ -191,10 +191,53 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				loggerInstance.addChunk('log5');
 
 				const flag = loggerInstance.getFlag('warning-flag');
-				expect(flag?.matches[0]?.contextWindow).toEqual([
-					'log2',
-					'WARN: something happened',
-				]);
+				expect(flag?.matches[0]?.contextWindowSize).toBe(3);
+				expect(flag?.matches[0]?.logIndex).toBe(2);
+			});
+
+			it('Should get context window on demand for past logs', () => {
+				loggerInstance.addFlag('test-flag', {
+					pattern: 'TEST',
+					color: 'blue',
+					contextWindowSize: 3,
+				});
+
+				loggerInstance.addChunk('log1');
+				loggerInstance.addChunk('log2');
+				loggerInstance.addChunk('TEST at middle');
+				loggerInstance.addChunk('log4');
+				loggerInstance.addChunk('log5');
+
+				const flag = loggerInstance.getFlag('test-flag');
+				const match = flag?.matches[0];
+				const context = loggerInstance.getContextWindow(
+					match!.logIndex,
+					match!.contextWindowSize,
+				);
+
+				expect(context).toEqual(['log2', 'TEST at middle', 'log4']);
+			});
+
+			it('Should get context window with future logs after match', () => {
+				loggerInstance.addFlag('test-flag', {
+					pattern: 'MATCH',
+					color: 'green',
+					contextWindowSize: 5,
+				});
+
+				loggerInstance.addChunk('log1');
+				loggerInstance.addChunk('MATCH here');
+				loggerInstance.addChunk('log3');
+				loggerInstance.addChunk('log4');
+
+				const flag = loggerInstance.getFlag('test-flag');
+				const match = flag?.matches[0];
+				const context = loggerInstance.getContextWindow(
+					match!.logIndex,
+					match!.contextWindowSize,
+				);
+
+				expect(context).toEqual(['log1', 'MATCH here', 'log3', 'log4']);
 			});
 
 			it('Should handle context window at buffer boundaries', () => {
@@ -207,7 +250,13 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				loggerInstance.addChunk('TEST at start');
 
 				const flag = loggerInstance.getFlag('test-flag');
-				expect(flag?.matches[0]?.contextWindow).toEqual(['TEST at start']);
+				const match = flag?.matches[0];
+				const context = loggerInstance.getContextWindow(
+					match!.logIndex,
+					match!.contextWindowSize,
+				);
+
+				expect(context).toEqual(['TEST at start']);
 			});
 
 			it('Should remove flag', () => {

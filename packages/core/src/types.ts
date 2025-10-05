@@ -14,7 +14,7 @@ export interface FlagMatch {
 	logIndex: number;
 	matchedText: string;
 	timestamp: number;
-	contextWindow: string[];
+	contextWindowSize: number;
 }
 
 export interface Flag {
@@ -92,6 +92,7 @@ export interface ProcessLoggerI {
 	getFlag(name: string): FlagState | undefined;
 	getAllFlags(): Map<string, FlagState>;
 	clearFlags(): void;
+	getContextWindow(logIndex: number, windowSize: number): string[];
 }
 
 export interface ReadyCheck {

@@ -564,6 +564,12 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 												state.selectedFlagNode === matchNodeId;
 											const showContext =
 												state.matchContextVisible?.has(matchNodeId);
+											const contextWindow = showContext
+												? logger.getContextWindow(
+														match.logIndex,
+														match.contextWindowSize,
+												  )
+												: null;
 											items.push(
 												<Box
 													key={matchNodeId}
@@ -582,12 +588,12 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 														{match.matchedText.substring(0, 60)}
 														{match.matchedText.length > 60 ? '...' : ''}
 													</Text>
-													{showContext && match.contextWindow && (
+													{showContext && contextWindow && (
 														<Box flexDirection="column" paddingLeft={2}>
-															{match.contextWindow.map((line, lineIdx) => {
+															{contextWindow.map((line, lineIdx) => {
 																const isMatchLine =
 																	lineIdx ===
-																	Math.floor(match.contextWindow.length / 2);
+																	Math.floor(contextWindow.length / 2);
 																return (
 																	<Text
 																		key={lineIdx}

@@ -163,16 +163,11 @@ export class ProcessLogger implements ProcessLoggerI {
 					: flagState.flag.pattern;
 
 			if (pattern.test(chunk)) {
-				const contextWindow = this._getContextWindow(
-					logIndex,
-					flagState.flag.contextWindowSize || 5,
-				);
-
 				const match: FlagMatch = {
 					logIndex,
 					matchedText: chunk,
 					timestamp: Date.now(),
-					contextWindow,
+					contextWindowSize: flagState.flag.contextWindowSize || 5,
 				};
 
 				flagState.count++;
@@ -181,7 +176,7 @@ export class ProcessLogger implements ProcessLoggerI {
 		}
 	}
 
-	private _getContextWindow(logIndex: number, windowSize: number): string[] {
+	public getContextWindow(logIndex: number, windowSize: number): string[] {
 		const halfWindow = Math.floor(windowSize / 2);
 		const start = Math.max(0, logIndex - halfWindow);
 		const end = Math.min(this._buffer.length, logIndex + halfWindow + 1);
