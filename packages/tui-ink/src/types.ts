@@ -258,6 +258,7 @@ export interface TUIState {
 	flagPanelFocused?: boolean;
 	selectedFlagNode?: string;
 	expandedFlagNodes?: Set<string>;
+	matchContextVisible?: Set<string>;
 }
 
 export interface TUIKeyPressMeta {

@@ -562,8 +562,14 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 											const matchNodeId = `${flagNodeId}:match:${idx}`;
 											const isMatchSelected =
 												state.selectedFlagNode === matchNodeId;
+											const showContext =
+												state.matchContextVisible?.has(matchNodeId);
 											items.push(
-												<Box key={matchNodeId} paddingLeft={2}>
+												<Box
+													key={matchNodeId}
+													paddingLeft={2}
+													flexDirection="column"
+												>
 													<Text
 														bold={isMatchSelected}
 														inverse={isMatchSelected}
@@ -576,6 +582,24 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 														{match.matchedText.substring(0, 60)}
 														{match.matchedText.length > 60 ? '...' : ''}
 													</Text>
+													{showContext && match.contextWindow && (
+														<Box flexDirection="column" paddingLeft={2}>
+															{match.contextWindow.map((line, lineIdx) => {
+																const isMatchLine =
+																	lineIdx ===
+																	Math.floor(match.contextWindow.length / 2);
+																return (
+																	<Text
+																		key={lineIdx}
+																		dimColor={!isMatchLine}
+																		color={isMatchLine ? undefined : 'gray'}
+																	>
+																		{line}
+																	</Text>
+																);
+															})}
+														</Box>
+													)}
 												</Box>,
 											);
 										});

@@ -241,4 +241,43 @@ describe('InkTUI - Flag State Management', () => {
 
 		expect(afterNode).toBe(initialNode);
 	});
+
+	it('should toggle context window for match nodes', () => {
+		const keyHandler = (tui as any).keyPressCallback;
+		keyHandler('f');
+
+		const state = (tui as any).managedState;
+		const flagNode = 'flag:test-flag';
+		state.selectedFlagNode = flagNode;
+		keyHandler('flag-enter');
+		expect(state.expandedFlagNodes.has(flagNode)).toBe(true);
+
+		const matchNode = 'flag:test-flag:match:0';
+		state.selectedFlagNode = matchNode;
+		expect(state.matchContextVisible).toBeUndefined();
+
+		keyHandler('flag-enter');
+		expect(state.matchContextVisible?.has(matchNode)).toBe(true);
+
+		keyHandler('flag-enter');
+		expect(state.matchContextVisible?.has(matchNode)).toBe(false);
+	});
+
+	it('should initialize matchContextVisible set when toggling context', () => {
+		const keyHandler = (tui as any).keyPressCallback;
+		keyHandler('f');
+
+		const state = (tui as any).managedState;
+		const flagNode = 'flag:test-flag';
+		state.selectedFlagNode = flagNode;
+		keyHandler('flag-enter');
+
+		const matchNode = 'flag:test-flag:match:0';
+		state.selectedFlagNode = matchNode;
+		state.matchContextVisible = undefined;
+
+		keyHandler('flag-enter');
+		expect(state.matchContextVisible).toBeInstanceOf(Set);
+		expect(state.matchContextVisible?.has(matchNode)).toBe(true);
+	});
 });

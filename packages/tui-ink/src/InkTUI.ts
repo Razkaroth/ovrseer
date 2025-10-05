@@ -346,7 +346,22 @@ export class InkTUI extends InkTUIWrapper {
 			} else {
 				this.managedState.expandedFlagNodes.add(node);
 			}
+		} else if (node.includes(':match:')) {
+			this.toggleFlagMatchContext();
 		}
 		this.render(this.managedProcesses, this.managedState);
+	}
+
+	private toggleFlagMatchContext(): void {
+		if (!this.managedState.selectedFlagNode) return;
+		if (!this.managedState.matchContextVisible) {
+			this.managedState.matchContextVisible = new Set();
+		}
+		const node = this.managedState.selectedFlagNode;
+		if (this.managedState.matchContextVisible.has(node)) {
+			this.managedState.matchContextVisible.delete(node);
+		} else {
+			this.managedState.matchContextVisible.add(node);
+		}
 	}
 }
