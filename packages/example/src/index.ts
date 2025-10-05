@@ -1,22 +1,22 @@
-import { ProcessManager, ManagedProcess, SimpleLogger } from '@ovrseer/core';
-import { EventDrivenTUIWrapper } from '@ovrseer/tui-ink';
+import {Ovrseer, ProcessUnit, ProcessLogger} from '@ovrseer/core';
+import {InkTUI} from '@ovrseer/tui-ink';
 
-const tui = new EventDrivenTUIWrapper();
-const pm = new ProcessManager({
+const tui = new InkTUI();
+const pm = new Ovrseer({
 	retries: 3,
 });
 
-const dbDependency = new ManagedProcess(
+const dbDependency = new ProcessUnit(
 	'sh',
 	[
 		'-c',
 		'sleep 1 && echo "Waiting for database to be ready..."; sleep 3; echo "Database is ready!"; sleep 20',
 	],
-	[{ logPattern: /Database is ready!/, timeout: 5000 }],
-	new SimpleLogger(1000, 100),
+	[{logPattern: /Database is ready!/, timeout: 5000}],
+	new ProcessLogger(1000, 100),
 );
 
-const redisDependency = new ManagedProcess(
+const redisDependency = new ProcessUnit(
 	'node',
 	['-e', 'setInterval(() => console.log("Redis is ready..."), 1000)'],
 	[
@@ -25,38 +25,38 @@ const redisDependency = new ManagedProcess(
 			timeout: 5000,
 		},
 	],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
 pm.addDependency('db', dbDependency);
 pm.addDependency('redis', redisDependency);
 
-const webServer = new ManagedProcess(
+const webServer = new ProcessUnit(
 	'node',
 	['-e', 'setInterval(() => console.log("Web server running..."), 2000)'],
 	[],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
-const apiServer = new ManagedProcess(
+const apiServer = new ProcessUnit(
 	'node',
 	['-e', 'setInterval(() => console.log("API server responding..."), 3000)'],
 	[],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
-const worker = new ManagedProcess(
+const worker = new ProcessUnit(
 	'node',
 	['-e', 'setInterval(() => console.log("Processing jobs..."), 4000)'],
 	[],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
 pm.addMainProcess('web-server', webServer);
 pm.addMainProcess('api-server', apiServer);
 pm.addMainProcess('worker', worker);
 
-const cleanupProcess1 = new ManagedProcess(
+const cleanupProcess1 = new ProcessUnit(
 	'node',
 	[
 		'-e',
@@ -68,17 +68,17 @@ const cleanupProcess1 = new ManagedProcess(
 			timeout: 5000,
 		},
 	],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
-const cleanupProcess2 = new ManagedProcess(
+const cleanupProcess2 = new ProcessUnit(
 	'node',
 	[
 		'-e',
 		'console.log("Cleaning up..."); setTimeout(() => console.log("Cleaned up!"), 2000)',
 	],
 	[],
-	new SimpleLogger(1000, 100),
+	new ProcessLogger(1000, 100),
 );
 
 pm.addCleanupProcess('cleanup1', cleanupProcess1);

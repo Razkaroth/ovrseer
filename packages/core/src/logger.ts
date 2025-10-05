@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
-import {ProcessLogger} from './types.js';
+import {ProcessLoggerI} from './types.js';
 
-export class SimpleLogger implements ProcessLogger {
+export class ProcessLogger implements ProcessLoggerI {
 	private _buffer: string[] = [];
 	private _errorBuffer: string[] = [];
 	private readonly _maxLogSize: number;

@@ -1,4 +1,4 @@
-import {SimpleLogger} from '../logger';
+import {ProcessLogger} from '../logger';
 import type {ReadyCheck} from '../types';
 
 vi.mock('child_process', async importOriginal => {
@@ -12,13 +12,13 @@ vi.mock('child_process', async importOriginal => {
 import {spawn} from 'child_process';
 
 import EventEmitter from 'events';
-import {ManagedProcess} from '../managed-process';
+import {ProcessUnit} from '../process-unit';
 const mockSpawn = vi.mocked(spawn);
 
 import {
 	makeStubProc,
-	createManagedProcess as createManagedProcessFactory,
-	trackedCreateManagedProcess,
+	createProcessUnit as createManagedProcessFactory,
+	trackedCreateProcessUnit,
 } from './mocks';
 
 const simpleReadyCheck: ReadyCheck = {
@@ -37,32 +37,26 @@ const passIfNotFoundReadyCheck: ReadyCheck = {
 	passIfNotFound: true,
 };
 
-describe('ManagedProcess', () => {
-	let mockLogger: SimpleLogger;
+describe('ProcessUnit', () => {
+	let mockLogger: ProcessLogger;
 	let readyChecks: ReadyCheck[];
 	let stubStdout: EventEmitter;
 	let stubStderr: EventEmitter;
 	let procEmitter: EventEmitter;
 	let stubProc: any;
-	let createdProcesses: ManagedProcess[] = [];
+	let createdProcesses: ProcessUnit[] = [];
 
 	// Helper function to create and track processes for proper cleanup
-	const createManagedProcess = (
+	const createProcessUnit = (
 		command: string,
 		args: string[],
 		checks: ReadyCheck[],
-		logger?: SimpleLogger,
+		logger?: ProcessLogger,
 	) =>
-		trackedCreateManagedProcess(
-			createdProcesses,
-			command,
-			args,
-			checks,
-			logger,
-		);
+		trackedCreateProcessUnit(createdProcesses, command, args, checks, logger);
 
 	beforeEach(() => {
-		mockLogger = new SimpleLogger(10, 5);
+		mockLogger = new ProcessLogger(10, 5);
 		readyChecks = [simpleReadyCheck];
 
 		stubStdout = new EventEmitter();
@@ -103,7 +97,7 @@ describe('ManagedProcess', () => {
 
 	describe('Constructor', () => {
 		it('should initialize with correct properties', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -119,7 +113,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should create ready and finished promises', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -133,7 +127,7 @@ describe('ManagedProcess', () => {
 
 	describe('start() method', () => {
 		it('should change status to running when starting the process', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'sleep',
 				['1'],
 				readyChecks,
@@ -146,7 +140,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should set listeners to process exit events', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -161,7 +155,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should set listeners to process error events', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -176,7 +170,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should set listeners to stdout data events', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -191,7 +185,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should set listeners to stderr data events', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -206,7 +200,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should throw if process is already running', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -219,7 +213,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should spawn a child process when is called', () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				readyChecks,
@@ -232,7 +226,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should resolve ready promise immediately when no ready checks are provided', async () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -241,7 +235,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should resolve ready promise when ready check passes', async () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['ready'],
 				[simpleReadyCheck],
@@ -266,7 +260,7 @@ describe('ManagedProcess', () => {
 		it('should reject ready promise when ready check fails', async () => {
 			vi.useFakeTimers();
 
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[timeoutReadyCheck],
@@ -290,7 +284,7 @@ describe('ManagedProcess', () => {
 		it('should resolve ready promise anyway after timeout if passIfNotFound is true', async () => {
 			vi.useFakeTimers();
 
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[passIfNotFoundReadyCheck],
@@ -313,7 +307,7 @@ describe('ManagedProcess', () => {
 		}, 1000);
 
 		it('should set to couldNotSpawn when could not spawn process', async () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[passIfNotFoundReadyCheck],
@@ -337,7 +331,7 @@ describe('ManagedProcess', () => {
 
 	describe('callbacks', () => {
 		it('calls onReady callbacks when ready resolves', async () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 			const readySpy = vi.fn();
 			process.onReady(readySpy);
 
@@ -348,7 +342,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('calls onExit callbacks when process exits', async () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 			const exitSpy = vi.fn();
 			process.onExit(exitSpy);
 
@@ -361,7 +355,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('calls onCrash callbacks when process crashes', async () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[simpleReadyCheck],
@@ -388,13 +382,13 @@ describe('ManagedProcess', () => {
 
 	describe('stop()', () => {
 		it('should error if process is not running', () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			expect(() => process.stop()).toThrow();
 		});
 
 		it('should set status to stopping immediately', () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -404,7 +398,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should resolve finished promise when process is stopped', async () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -416,7 +410,7 @@ describe('ManagedProcess', () => {
 
 		it('should escalate to kill if process does not exit after timeout', async () => {
 			vi.useFakeTimers();
-			const process = createManagedProcess('sleep', ['10'], [], mockLogger);
+			const process = createProcessUnit('sleep', ['10'], [], mockLogger);
 
 			// Spy on the kill method properly
 			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
@@ -438,13 +432,13 @@ describe('ManagedProcess', () => {
 
 	describe('kill()', () => {
 		it('should error if process is not running', () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			expect(() => process.kill()).toThrow();
 		});
 
 		it('should set status to crashed immediately', () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -458,7 +452,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should reject finished promise when process is killed', async () => {
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -478,7 +472,7 @@ describe('ManagedProcess', () => {
 		});
 		it('should throw when prepareForRestart is called while running', () => {
 			mockSpawn.mockImplementationOnce(() => firstProc.proc as any);
-			const process = createManagedProcess('echo', ['hello'], [], mockLogger);
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
 
@@ -486,7 +480,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should reset state after process exits and allow start again', async () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[simpleReadyCheck],
@@ -515,7 +509,7 @@ describe('ManagedProcess', () => {
 		});
 
 		it('should allow restart after crash (couldNotSpawn/crashed)', async () => {
-			const process = createManagedProcess(
+			const process = createProcessUnit(
 				'echo',
 				['hello'],
 				[simpleReadyCheck],

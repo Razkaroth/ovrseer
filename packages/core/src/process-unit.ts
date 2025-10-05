@@ -1,9 +1,9 @@
 import {spawn, ChildProcess} from 'child_process';
-import {ProcessLogger, ProcessStatus, ReadyCheck} from './types.js';
+import {ProcessLoggerI, ProcessStatus, ReadyCheck} from './types.js';
 
 type StopSignal = NodeJS.Signals;
 
-export class ManagedProcess {
+export class ProcessUnit {
 	private _process: ChildProcess | null = null;
 	private _status: ProcessStatus = 'created';
 	private _checksPassed: number = 0;
@@ -26,7 +26,7 @@ export class ManagedProcess {
 	command: string;
 	args: string[];
 	readyChecks: ReadyCheck[];
-	logger: ProcessLogger;
+	logger: ProcessLoggerI;
 	ready: Promise<void>;
 	finished: Promise<void>;
 
@@ -38,7 +38,7 @@ export class ManagedProcess {
 		command: string,
 		args: string[],
 		readyChecks: ReadyCheck[],
-		logger: ProcessLogger,
+		logger: ProcessLoggerI,
 	) {
 		this.command = command;
 		this.args = args;
@@ -201,7 +201,7 @@ export class ManagedProcess {
 			});
 		}
 
-		this.logger.onError(chunk => {
+		this.logger.onError((chunk: string) => {
 			this._cleanupTimersAndSubscriptions();
 			this._status = 'crashed';
 			this._readyReject(new Error(chunk));
@@ -251,7 +251,7 @@ export class ManagedProcess {
 
 		this.readyChecks.forEach(check => {
 			// subscribe to process events
-			const unsubscribe = this.logger.onLog(chunk => {
+			const unsubscribe = this.logger.onLog((chunk: string) => {
 				if (check.logPattern instanceof RegExp) {
 					if (check.logPattern.test(chunk)) {
 						this._checksPassed++;

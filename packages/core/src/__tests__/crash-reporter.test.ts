@@ -1,7 +1,7 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {CrashReporter} from '../crash-reporter';
-import {SimpleLogger} from '../logger';
-import {fakeManagedProcess} from './mocks';
+import {ProcessLogger} from '../logger';
+import {fakeProcessUnit} from './mocks';
 import type {CrashReport} from '../types';
 import {join} from 'path';
 import {tmpdir} from 'os';
@@ -24,11 +24,11 @@ vi.mock('fs/promises', () => ({
 
 describe('CrashReporter', () => {
 	let crashReporter: CrashReporter;
-	let mockLogger: SimpleLogger;
+	let mockLogger: ProcessLogger;
 
 	beforeEach(() => {
 		crashReporter = new CrashReporter();
-		mockLogger = new SimpleLogger(10, 5);
+		mockLogger = new ProcessLogger(10, 5);
 		vi.clearAllMocks();
 		mockWriteFile.mockResolvedValue(undefined);
 		mockMkdir.mockResolvedValue(undefined);
@@ -54,7 +54,7 @@ describe('CrashReporter', () => {
 			mockLogger.onError(() => {}); // Add error listener to prevent unhandled error
 			mockLogger.addChunk('log1');
 			mockLogger.addChunk('error1', true);
-			const process = fakeManagedProcess({
+			const process = fakeProcessUnit({
 				logger: mockLogger,
 				getStatus: vi.fn(() => 'crashed' as any),
 			});
@@ -69,7 +69,7 @@ describe('CrashReporter', () => {
 		});
 
 		it('includes context and retryCount when provided', () => {
-			const process = fakeManagedProcess({logger: mockLogger});
+			const process = fakeProcessUnit({logger: mockLogger});
 			const report = crashReporter.generateReport(
 				'pid',
 				process,

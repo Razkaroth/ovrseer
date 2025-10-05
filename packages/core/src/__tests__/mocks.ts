@@ -1,8 +1,8 @@
 import {vi} from 'vitest';
 import EventEmitter from 'events';
-import {ManagedProcess} from '../managed-process';
-import {SimpleLogger} from '../logger';
-import type {ReadyCheck, ManagedProcessI, ProcessStatus} from '../types';
+import {ProcessUnit} from '../process-unit';
+import {ProcessLogger} from '../logger';
+import type {ReadyCheck, ProcessUnitI, ProcessStatus} from '../types';
 
 export function makeStubProc() {
 	const stdout = new EventEmitter();
@@ -16,20 +16,20 @@ export function makeStubProc() {
 	return {proc, stdout, stderr};
 }
 
-export function createManagedProcess(
+export function createProcessUnit(
 	command: string,
 	args: string[],
 	checks: ReadyCheck[],
-	logger?: SimpleLogger,
+	logger?: ProcessLogger,
 ) {
-	const simpleLogger = logger ?? new SimpleLogger(10, 5);
-	return new ManagedProcess(command, args, checks, simpleLogger);
+	const simpleLogger = logger ?? new ProcessLogger(10, 5);
+	return new ProcessUnit(command, args, checks, simpleLogger);
 }
 
-export function fakeManagedProcess(overrides?: Partial<ManagedProcessI>) {
+export function fakeProcessUnit(overrides?: Partial<ProcessUnitI>) {
 	let onCrashCb: ((err: Error) => void) | null = null;
-	const logger = new SimpleLogger(10, 5);
-	const base: Partial<ManagedProcessI> = {
+	const logger = new ProcessLogger(10, 5);
+	const base: Partial<ProcessUnitI> = {
 		logger,
 		ready: Promise.resolve(),
 		finished: Promise.resolve(),
@@ -49,10 +49,7 @@ export function fakeManagedProcess(overrides?: Partial<ManagedProcessI>) {
 		onReady: vi.fn((_cb: any) => {}),
 	};
 
-	const obj: ManagedProcessI = Object.assign(
-		base,
-		overrides,
-	) as ManagedProcessI;
+	const obj: ProcessUnitI = Object.assign(base, overrides) as ProcessUnitI;
 
 	(obj as any)._triggerCrash = (err: Error) => {
 		if (onCrashCb) onCrashCb(err);
@@ -61,14 +58,14 @@ export function fakeManagedProcess(overrides?: Partial<ManagedProcessI>) {
 	return obj;
 }
 
-export function trackedCreateManagedProcess(
-	createdProcesses: ManagedProcess[],
+export function trackedCreateProcessUnit(
+	createdProcesses: ProcessUnit[],
 	command: string,
 	args: string[],
 	checks: ReadyCheck[],
-	logger?: SimpleLogger,
+	logger?: ProcessLogger,
 ) {
-	const process = createManagedProcess(command, args, checks, logger);
+	const process = createProcessUnit(command, args, checks, logger);
 	createdProcesses.push(process);
 	return process;
 }

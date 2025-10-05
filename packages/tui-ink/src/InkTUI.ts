@@ -1,14 +1,14 @@
 import type {TUIKeyPressMeta} from '@ovrseer/core';
 import type {
-	ProcessManagerI,
+	OvrseerI,
 	ProcessMap,
 	TUIState,
 	ProcessManagerEvents,
 } from './types.js';
 import {InkTUIWrapper} from './InkTUIWrapper.js';
 
-export class EventDrivenTUIWrapper extends InkTUIWrapper {
-	private manager: ProcessManagerI | null = null;
+export class InkTUI extends InkTUIWrapper {
+	private manager: OvrseerI | null = null;
 	private managedProcesses: ProcessMap = {
 		dependencies: new Map(),
 		main: new Map(),
@@ -16,7 +16,7 @@ export class EventDrivenTUIWrapper extends InkTUIWrapper {
 	};
 	private managedState: TUIState = {};
 
-	attachToManager(manager: ProcessManagerI): void {
+	attachToManager(manager: OvrseerI): void {
 		if (this.manager) {
 			throw new Error('Already attached to a manager');
 		}

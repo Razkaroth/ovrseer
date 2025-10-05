@@ -1,8 +1,8 @@
 /**
  * A managed process instance with lifecycle control and monitoring
  */
-export interface ManagedProcessI {
-	readonly logger: ProcessLogger;
+export interface ProcessUnitI {
+	readonly logger: ProcessLoggerI;
 	readonly ready: Promise<void>;
 	readonly finished: Promise<void>;
 
@@ -51,7 +51,7 @@ type getLogsParams = {
 	separator?: string;
 };
 
-export interface ProcessLogger {
+export interface ProcessLoggerI {
 	onLog(listener: (chunk: string) => void): () => void; // returns unsubscribe
 	onError(listener: (chunk: string) => void): () => void; // returns unsubscribe
 	getLogs(options?: getLogsParams): string;
@@ -112,16 +112,16 @@ export type ProcessManagerEvents = {
 	};
 };
 
-export interface ProcessManagerI {
-	addDependency(id: string, process: ManagedProcessI): void;
+export interface OvrseerI {
+	addDependency(id: string, process: ProcessUnitI): void;
 	removeDependency(id: string): void;
-	getDependency(id: string): ManagedProcessI | undefined;
-	addMainProcess(id: string, process: ManagedProcessI): void;
+	getDependency(id: string): ProcessUnitI | undefined;
+	addMainProcess(id: string, process: ProcessUnitI): void;
 	removeMainProcess(id: string): void;
-	getMainProcess(id: string): ManagedProcessI | undefined;
-	addCleanupProcess(id: string, process: ManagedProcessI): void;
+	getMainProcess(id: string): ProcessUnitI | undefined;
+	addCleanupProcess(id: string, process: ProcessUnitI): void;
 	removeCleanupProcess(id: string): void;
-	getCleanupProcess(id: string): ManagedProcessI | undefined;
+	getCleanupProcess(id: string): ProcessUnitI | undefined;
 
 	start(): void;
 	stop(): void;
@@ -180,7 +180,7 @@ export interface CrashReporterI {
 	 */
 	generateReport(
 		processId: string,
-		process: ManagedProcessI,
+		process: ProcessUnitI,
 		type: ReportType,
 		context?: Record<string, any>,
 	): CrashReport;
@@ -200,9 +200,9 @@ export interface CrashReporterI {
 export type TUIProcessType = 'dependency' | 'main' | 'cleanup';
 
 export type ProcessMap = {
-	dependencies: Map<string, ManagedProcessI>;
-	main: Map<string, ManagedProcessI>;
-	cleanup: Map<string, ManagedProcessI>;
+	dependencies: Map<string, ProcessUnitI>;
+	main: Map<string, ProcessUnitI>;
+	cleanup: Map<string, ProcessUnitI>;
 };
 
 export interface TUIState {
@@ -243,7 +243,7 @@ export interface TUIRendererI {
 	render(processes: ProcessMap, state: TUIState): void;
 
 	/**
-	 * Register a keypress/callback hook. The ProcessManager will use this
+	 * Register a keypress/callback hook. The Ovrseer will use this
 	 * to map keys (r, q, arrows, tab, etc) to actions.
 	 */
 	onKeyPress(callback: (key: string, meta?: TUIKeyPressMeta) => void): void;

@@ -1,6 +1,6 @@
 import type {
-	ProcessManagerI,
-	ManagedProcessI,
+	OvrseerI,
+	ProcessUnitI,
 	TUIProcessType,
 	CrashReporterI,
 	ProcessManagerEvents,
@@ -8,7 +8,7 @@ import type {
 import {CrashReporter} from './crash-reporter.js';
 import {EventEmitter} from 'events';
 
-// Options for configuring the ProcessManager
+// Options for configuring the Ovrseer
 // cleanupTimeout: max ms to wait for each cleanup process.finished before continuing
 // waitTime retained for backward compatibility (no longer used for restartAll delay)
 type ProcessManagerOptions = {
@@ -18,10 +18,10 @@ type ProcessManagerOptions = {
 	crashReporter?: CrashReporterI;
 };
 
-export class ProcessManager implements ProcessManagerI {
-	private dependencies = new Map<string, ManagedProcessI>();
-	private mainProcesses = new Map<string, ManagedProcessI>();
-	private cleanupProcesses = new Map<string, ManagedProcessI>();
+export class Ovrseer implements OvrseerI {
+	private dependencies = new Map<string, ProcessUnitI>();
+	private mainProcesses = new Map<string, ProcessUnitI>();
+	private cleanupProcesses = new Map<string, ProcessUnitI>();
 	private cleanupOrder: Array<string> = [];
 	private retryCount = new Map<string, number>();
 	private maxRetries: number;
@@ -84,7 +84,7 @@ export class ProcessManager implements ProcessManagerI {
 		});
 	}
 
-	addDependency(id: string, process: ManagedProcessI): void {
+	addDependency(id: string, process: ProcessUnitI): void {
 		this.dependencies.set(id, process);
 		this.emit('process:added', {
 			id,
@@ -102,11 +102,11 @@ export class ProcessManager implements ProcessManagerI {
 		});
 	}
 
-	getDependency(id: string): ManagedProcessI | undefined {
+	getDependency(id: string): ProcessUnitI | undefined {
 		return this.dependencies.get(id);
 	}
 
-	addMainProcess(id: string, process: ManagedProcessI): void {
+	addMainProcess(id: string, process: ProcessUnitI): void {
 		this.mainProcesses.set(id, process);
 		this.emit('process:added', {id, type: 'main', timestamp: Date.now()});
 	}
@@ -120,11 +120,11 @@ export class ProcessManager implements ProcessManagerI {
 		});
 	}
 
-	getMainProcess(id: string): ManagedProcessI | undefined {
+	getMainProcess(id: string): ProcessUnitI | undefined {
 		return this.mainProcesses.get(id);
 	}
 
-	addCleanupProcess(id: string, process: ManagedProcessI): void {
+	addCleanupProcess(id: string, process: ProcessUnitI): void {
 		this.cleanupProcesses.set(id, process);
 		if (!this.cleanupOrder.includes(id)) {
 			this.cleanupOrder.push(id);
@@ -146,7 +146,7 @@ export class ProcessManager implements ProcessManagerI {
 		});
 	}
 
-	getCleanupProcess(id: string): ManagedProcessI | undefined {
+	getCleanupProcess(id: string): ProcessUnitI | undefined {
 		return this.cleanupProcesses.get(id);
 	}
 
@@ -280,7 +280,7 @@ export class ProcessManager implements ProcessManagerI {
 	}
 
 	restartProcess(id: string, processType?: TUIProcessType): void {
-		let process: ManagedProcessI | undefined;
+		let process: ProcessUnitI | undefined;
 		let actualType: TUIProcessType | undefined;
 
 		if (processType === 'dependency') {
@@ -403,7 +403,7 @@ export class ProcessManager implements ProcessManagerI {
 
 	private setupProcessHandlers(
 		id: string,
-		process: ManagedProcessI,
+		process: ProcessUnitI,
 		type: TUIProcessType,
 	): void {
 		process.onCrash(async err => {
@@ -464,7 +464,7 @@ export class ProcessManager implements ProcessManagerI {
 
 	private async handleCrash(
 		id: string,
-		process: ManagedProcessI,
+		process: ProcessUnitI,
 		type: TUIProcessType,
 		error: Error,
 	): Promise<void> {
@@ -555,7 +555,7 @@ export class ProcessManager implements ProcessManagerI {
 	private getProcessByIdAndType(
 		id: string,
 		type: TUIProcessType,
-	): ManagedProcessI | undefined {
+	): ProcessUnitI | undefined {
 		if (type === 'dependency') return this.dependencies.get(id);
 		if (type === 'main') return this.mainProcesses.get(id);
 		if (type === 'cleanup') return this.cleanupProcesses.get(id);

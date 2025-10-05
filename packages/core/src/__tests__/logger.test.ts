@@ -1,6 +1,6 @@
-import {SimpleLogger} from '../logger';
+import {ProcessLogger} from '../logger';
 
-describe.each([['SimpleLogger', SimpleLogger]])(
+describe.each([['ProcessLogger', ProcessLogger]])(
 	'%s Process logger',
 	(loggerName, logger) => {
 		const loggerInstance = new logger(10, 5, '');

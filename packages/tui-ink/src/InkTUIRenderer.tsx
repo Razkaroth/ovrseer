@@ -5,13 +5,13 @@ import type {
 	TUIState,
 	TUIProcessType,
 	TUIKeyPressMeta,
-	ManagedProcessI,
+	ProcessUnitI,
 } from './types.js';
 
 type ProcessItem = {
 	id: string;
 	type: TUIProcessType;
-	process: ManagedProcessI;
+	process: ProcessUnitI;
 };
 
 type InkTUIRendererProps = {

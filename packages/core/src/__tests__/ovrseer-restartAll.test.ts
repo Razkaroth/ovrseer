@@ -1,8 +1,8 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
-import {ProcessManager} from '../process-manager';
-import type {ManagedProcessI, ProcessStatus} from '../types';
+import {Ovrseer} from '../ovrseer';
+import type {ProcessUnitI, ProcessStatus} from '../types';
 
-function makeMockProcess(id: string): ManagedProcessI {
+function makeMockProcess(id: string): ProcessUnitI {
 	let status: ProcessStatus = 'created';
 	const logListeners: Array<(chunk: string) => void> = [];
 	const errListeners: Array<(chunk: string) => void> = [];
@@ -62,13 +62,13 @@ function makeMockProcess(id: string): ManagedProcessI {
 	};
 }
 
-describe('ProcessManager.restartAll', () => {
-	let pm: ProcessManager;
+describe('Ovrseer.restartAll', () => {
+	let pm: Ovrseer;
 	let statusMessages: string[] = [];
 
 	beforeEach(() => {
 		statusMessages = [];
-		pm = new ProcessManager({
+		pm = new Ovrseer({
 			waitTime: 5,
 		});
 

@@ -1,7 +1,7 @@
 import type {
 	CrashReporterI,
 	CrashReport,
-	ManagedProcessI,
+	ProcessUnitI,
 	ReportType,
 } from './types.js';
 import {writeFile, mkdir} from 'fs/promises';
@@ -19,7 +19,7 @@ export class CrashReporter implements CrashReporterI {
 
 	generateReport(
 		processId: string,
-		process: ManagedProcessI,
+		process: ProcessUnitI,
 		type: ReportType,
 		context?: Record<string, any>,
 	): CrashReport {
