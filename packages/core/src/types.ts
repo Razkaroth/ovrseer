@@ -131,10 +131,7 @@ export interface ProcessManagerI {
 	restartAll(): void;
 	restartAllMainProcesses(): void;
 
-	startTuiSession(): void;
-
 	readonly crashReporter?: CrashReporterI;
-	readonly tui?: TUIRendererI;
 
 	on<K extends keyof ProcessManagerEvents>(
 		event: K,

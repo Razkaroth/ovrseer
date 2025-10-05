@@ -2,14 +2,11 @@ import type {
 	ProcessManagerI,
 	ManagedProcessI,
 	TUIProcessType,
-	ProcessMap,
-	TUIState,
 	CrashReporterI,
-	TUIRendererI,
 	ProcessManagerEvents,
 } from './types.js';
-import { CrashReporter } from './crash-reporter.js';
-import { EventEmitter } from 'events';
+import {CrashReporter} from './crash-reporter.js';
+import {EventEmitter} from 'events';
 
 // Options for configuring the ProcessManager
 // cleanupTimeout: max ms to wait for each cleanup process.finished before continuing
@@ -19,7 +16,6 @@ type ProcessManagerOptions = {
 	waitTime?: number;
 	cleanupTimeout?: number;
 	crashReporter?: CrashReporterI;
-	tui?: TUIRendererI;
 };
 
 export class ProcessManager implements ProcessManagerI {
@@ -32,10 +28,8 @@ export class ProcessManager implements ProcessManagerI {
 	private waitTime: number;
 	private cleanupTimeout: number;
 	private isRunning = false;
-	private tuiState: TUIState = {};
 
 	public readonly crashReporter?: CrashReporterI;
-	public readonly tui?: TUIRendererI;
 	public readonly events: EventEmitter;
 
 	constructor(options?: ProcessManagerOptions) {
@@ -43,7 +37,6 @@ export class ProcessManager implements ProcessManagerI {
 		this.waitTime = options?.waitTime ?? 1000;
 		this.cleanupTimeout = options?.cleanupTimeout ?? 5000;
 		this.crashReporter = options?.crashReporter ?? new CrashReporter();
-		this.tui = options?.tui;
 		this.events = new EventEmitter();
 	}
 
@@ -115,7 +108,7 @@ export class ProcessManager implements ProcessManagerI {
 
 	addMainProcess(id: string, process: ManagedProcessI): void {
 		this.mainProcesses.set(id, process);
-		this.emit('process:added', { id, type: 'main', timestamp: Date.now() });
+		this.emit('process:added', {id, type: 'main', timestamp: Date.now()});
 	}
 
 	removeMainProcess(id: string): void {
@@ -163,7 +156,7 @@ export class ProcessManager implements ProcessManagerI {
 		}
 
 		this.isRunning = true;
-		this.emit('manager:started', { timestamp: Date.now() });
+		this.emit('manager:started', {timestamp: Date.now()});
 
 		for (const [id, dep] of this.dependencies) {
 			this.setupProcessHandlers(id, dep, 'dependency');
@@ -187,7 +180,6 @@ export class ProcessManager implements ProcessManagerI {
 						});
 						proc.start();
 					}
-					this.updateTui();
 				})
 				.catch(async err => {
 					this.emit('dependency:failed', {
@@ -195,8 +187,6 @@ export class ProcessManager implements ProcessManagerI {
 						error: err,
 						timestamp: Date.now(),
 					});
-					this.tui?.showStatus?.(`Dependency failed to start: ${err.message}`);
-					// Attempt to stop all dependencies and await their stop() Promises
 					const deps = Array.from(this.dependencies.values());
 					await Promise.allSettled(
 						deps.map(async dep => {
@@ -208,30 +198,26 @@ export class ProcessManager implements ProcessManagerI {
 							}
 						}),
 					);
-					// Also run general stop to ensure cleanup processes run
 					try {
 						await this.stop();
-					} catch (e: any) {
-						this.tui?.showStatus?.(
-							`Error during stop after dependency failure: ${e?.message || e}`,
-						);
+					} catch {
+						/* ignore */
 					}
 				});
 		} else {
 			for (const [id, proc] of this.mainProcesses) {
 				this.setupProcessHandlers(id, proc, 'main');
-				this.emit('process:started', { id, type: 'main', timestamp: Date.now() });
+				this.emit('process:started', {id, type: 'main', timestamp: Date.now()});
 				proc.start();
 			}
 		}
 
-		this.updateTui();
 		this.emitStateUpdate();
 	}
 
 	async stop(): Promise<void> {
 		this.isRunning = false;
-		this.emit('manager:stopping', { timestamp: Date.now() });
+		this.emit('manager:stopping', {timestamp: Date.now()});
 
 		const mainProcesses = Array.from(this.mainProcesses.values());
 		const dependencies = Array.from(this.dependencies.values());
@@ -245,15 +231,14 @@ export class ProcessManager implements ProcessManagerI {
 		await Promise.allSettled(
 			mainProcesses
 				.filter(proc => proc.isRunning() || proc.getStatus() === 'stopping')
-				.map(proc => proc.finished.catch(() => { })),
+				.map(proc => proc.finished.catch(() => {})),
 		);
 
-		this.emit('cleanup:started', { timestamp: Date.now() });
+		this.emit('cleanup:started', {timestamp: Date.now()});
 		this.emit('status:message', {
 			message: 'Running cleanup processes...',
 			timestamp: Date.now(),
 		});
-		this.tui?.showStatus?.('Running cleanup processes...');
 		for (const id of this.cleanupOrder) {
 			const cleanup = this.cleanupProcesses.get(id);
 			if (!cleanup) continue;
@@ -269,10 +254,7 @@ export class ProcessManager implements ProcessManagerI {
 					id,
 				);
 			} catch (e: any) {
-				this.emit('cleanup:timeout', { id, error: e, timestamp: Date.now() });
-				this.tui?.showStatus?.(
-					`Cleanup ${id} timeout: ${e?.message || 'timeout'}`,
-				);
+				this.emit('cleanup:timeout', {id, error: e, timestamp: Date.now()});
 			}
 		}
 
@@ -285,17 +267,15 @@ export class ProcessManager implements ProcessManagerI {
 		await Promise.allSettled(
 			dependencies
 				.filter(dep => dep.isRunning() || dep.getStatus() === 'stopping')
-				.map(dep => dep.finished.catch(() => { })),
+				.map(dep => dep.finished.catch(() => {})),
 		);
 
-		this.emit('cleanup:finished', { timestamp: Date.now() });
+		this.emit('cleanup:finished', {timestamp: Date.now()});
 		this.emit('status:message', {
 			message: 'Cleanup finished',
 			timestamp: Date.now(),
 		});
-		this.emit('manager:stopped', { timestamp: Date.now() });
-		this.tui?.showStatus?.('Cleanup finished');
-		this.updateTui();
+		this.emit('manager:stopped', {timestamp: Date.now()});
 		this.emitStateUpdate();
 	}
 
@@ -326,7 +306,6 @@ export class ProcessManager implements ProcessManagerI {
 				message: `Process ${id} not found`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(`Process ${id} not found`);
 			return;
 		}
 
@@ -339,9 +318,7 @@ export class ProcessManager implements ProcessManagerI {
 			message: `Restarting ${id}...`,
 			timestamp: Date.now(),
 		});
-		this.tui?.showStatus?.(`Restarting ${id}...`);
 		process.restart();
-		this.updateTui();
 		this.emitStateUpdate();
 	}
 
@@ -351,7 +328,6 @@ export class ProcessManager implements ProcessManagerI {
 				message: 'Not running, starting...',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('Not running, starting...');
 			try {
 				this.start();
 			} catch (e: any) {
@@ -359,28 +335,22 @@ export class ProcessManager implements ProcessManagerI {
 					message: `Start failed: ${e?.message || e}`,
 					timestamp: Date.now(),
 				});
-				this.tui?.showStatus?.(`Start failed: ${e?.message || e}`);
 			}
 			return;
 		}
 
-		const prevSelectedId = this.tuiState.selectedProcessId;
-		const prevSelectedType = this.tuiState.selectedProcessType;
-
 		(async () => {
-			this.emit('manager:restarting', { timestamp: Date.now() });
+			this.emit('manager:restarting', {timestamp: Date.now()});
 			this.emit('status:message', {
 				message: 'Restarting all (stopping processes)...',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('Restarting all (stopping processes)...');
 			await this.stop();
 
 			this.emit('status:message', {
 				message: 'Restarting all (preparing for restart)...',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('Restarting all (preparing for restart)...');
 			for (const proc of this.dependencies.values()) {
 				try {
 					proc.prepareForRestart?.();
@@ -408,113 +378,27 @@ export class ProcessManager implements ProcessManagerI {
 				message: 'Restarting all (starting dependencies)...',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('Restarting all (starting dependencies)...');
 			this.start();
 			this.emit('status:message', {
 				message: 'Restarting all (starting main)...',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('Restarting all (starting main)...');
 
 			await new Promise(resolve => setTimeout(resolve, 0));
 			this.emit('status:message', {
 				message: 'All processes restarted',
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.('All processes restarted');
-
-			if (prevSelectedId && prevSelectedType) {
-				this.tuiState.selectedProcessId = prevSelectedId;
-				this.tuiState.selectedProcessType = prevSelectedType;
-				this.updateLiveLogsForSelectedProcess();
-			}
 		})();
 	}
 
 	restartAllMainProcesses(): void {
-		this.tui?.showStatus?.('Restarting all main processes...');
 		for (const [id, proc] of this.mainProcesses) {
 			if (proc.isRunning()) {
 				proc.restart();
 			}
 			this.retryCount.delete(id);
 		}
-		this.updateTui();
-	}
-
-	startTuiSession(): void {
-		if (!this.tui) return;
-
-		this.tui.init();
-
-		this.tui.onKeyPress(
-			async (key: string, meta?: import('./types').TUIKeyPressMeta) => {
-				if (key === 'q' || key === 'C-c') {
-					this.gracefulQuit(key);
-				} else if (key === 's') {
-					if (this.isRunning) {
-						try {
-							await this.stop();
-						} catch (e: any) {
-							this.tui?.showStatus?.(`Error stopping: ${e?.message || e}`);
-						}
-					} else {
-						this.start();
-					}
-				} else if (key === 'r') {
-					if (
-						this.tuiState.selectedProcessId &&
-						this.tuiState.selectedProcessType
-					) {
-						this.restartProcess(
-							this.tuiState.selectedProcessId,
-							this.tuiState.selectedProcessType,
-						);
-					}
-				} else if (key === 'R' || key === 'C-r') {
-					this.restartAll();
-				} else if (key === 'enter') {
-					if (
-						this.tuiState.selectedProcessId &&
-						this.tuiState.selectedProcessType
-					) {
-						const process = this.getProcessByIdAndType(
-							this.tuiState.selectedProcessId,
-							this.tuiState.selectedProcessType,
-						);
-						if (process) {
-							let logs = 'No logs available';
-							try {
-								logs = process.logger.getLogs();
-							} catch {
-								// ignore
-							}
-							this.tui?.showLogs?.(
-								this.tuiState.selectedProcessId!,
-								this.tuiState.selectedProcessType!,
-								logs,
-							);
-						}
-					}
-				} else if (key === 'up') {
-					this.tui?.selectPrevious();
-				} else if (key === 'down') {
-					this.tui?.selectNext();
-				} else if (key === 'select') {
-					if (meta?.processInfo) {
-						this.tuiState.selectedProcessId = meta.processInfo.id;
-						this.tuiState.selectedProcessType = meta.processInfo.type;
-						this.updateLiveLogsForSelectedProcess();
-					}
-				}
-			},
-		);
-
-		this.tui.showStatus('Ready');
-
-		this.tui.showInstructions?.(
-			`Keys:\n↑/↓ navigate  enter logs\nr restart selected  R/Ctrl-R restart all\nq quit (press twice to force)\n`,
-		);
 	}
 
 	private setupProcessHandlers(
@@ -530,9 +414,6 @@ export class ProcessManager implements ProcessManagerI {
 					message: `Error handling crash for ${id}: ${e?.message || e}`,
 					timestamp: Date.now(),
 				});
-				this.tui?.showStatus?.(
-					`Error handling crash for ${id}: ${e?.message || e}`,
-				);
 			}
 		});
 
@@ -548,21 +429,15 @@ export class ProcessManager implements ProcessManagerI {
 				message: `Process ${id} exited with code ${code}, signal ${signal}`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(
-				`Process ${id} exited with code ${code}, signal ${signal}`,
-			);
-			this.updateTui();
 			this.emitStateUpdate();
 		});
 
 		process.onReady(() => {
-			this.emit('process:ready', { id, type, timestamp: Date.now() });
+			this.emit('process:ready', {id, type, timestamp: Date.now()});
 			this.emit('status:message', {
 				message: `Process ${id} is ready`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(`Process ${id} is ready`);
-			this.updateTui();
 			this.emitStateUpdate();
 		});
 
@@ -574,13 +449,6 @@ export class ProcessManager implements ProcessManagerI {
 				isError: false,
 				timestamp: Date.now(),
 			});
-			this.updateTui();
-			if (
-				this.tuiState.selectedProcessId === id &&
-				this.tuiState.selectedProcessType === type
-			) {
-				this.updateLiveLogsForSelectedProcess();
-			}
 		});
 
 		process.logger.onError(message => {
@@ -591,83 +459,7 @@ export class ProcessManager implements ProcessManagerI {
 				isError: true,
 				timestamp: Date.now(),
 			});
-			this.updateTui();
-			if (
-				this.tuiState.selectedProcessId === id &&
-				this.tuiState.selectedProcessType === type
-			) {
-				this.updateLiveLogsForSelectedProcess();
-			}
 		});
-	}
-
-	private isQuitting = false;
-	private quitTimer: ReturnType<typeof setTimeout> | null = null;
-
-	private gracefulQuit(triggerKey?: string): void {
-		if (this.isQuitting) {
-			if (triggerKey === 'q') {
-				if (this.quitTimer) {
-					clearTimeout(this.quitTimer);
-					this.quitTimer = null;
-				}
-				this.tui?.destroy?.();
-				process.exit(0);
-			}
-			return;
-		}
-		this.isQuitting = true;
-
-		// Stop running processes
-		this.isRunning = false;
-		for (const proc of this.mainProcesses.values())
-			if (proc.isRunning()) {
-				try {
-					proc.stop();
-				} catch {
-					/* ignore */
-				}
-			}
-		for (const dep of this.dependencies.values())
-			if (dep.isRunning()) {
-				try {
-					dep.stop();
-				} catch {
-					/* ignore */
-				}
-			}
-
-		(async () => {
-			this.tui?.showStatus?.('Running cleanup processes...');
-			for (const [id, cleanup] of this.cleanupProcesses) {
-				try {
-					cleanup.start();
-				} catch {
-					/* ignore */
-				}
-				try {
-					cleanup.cleanup();
-				} catch {
-					/* ignore */
-				}
-				try {
-					await this.waitForPromiseWithTimeout(
-						cleanup.finished,
-						this.cleanupTimeout,
-						id,
-					);
-				} catch (e: any) {
-					this.tui?.showStatus?.(
-						`Cleanup ${id} timeout: ${e?.message || 'timeout'}`,
-					);
-				}
-			}
-			this.tui?.showStatus?.('cleanup finished');
-			this.quitTimer = setTimeout(() => {
-				this.tui?.destroy?.();
-				process.exit(0);
-			}, 2000);
-		})();
 	}
 
 	private async handleCrash(
@@ -691,7 +483,6 @@ export class ProcessManager implements ProcessManagerI {
 				message: `Dependency ${id} crashed: ${error.message}`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(`Dependency ${id} crashed: ${error.message}`);
 			if (this.crashReporter) {
 				const report = this.crashReporter.generateReport(
 					id,
@@ -708,13 +499,11 @@ export class ProcessManager implements ProcessManagerI {
 				await this.stop();
 			} catch (e: any) {
 				this.emit('status:message', {
-					message: `Error during stop after dependency crash: ${e?.message || e
-						}`,
+					message: `Error during stop after dependency crash: ${
+						e?.message || e
+					}`,
 					timestamp: Date.now(),
 				});
-				this.tui?.showStatus?.(
-					`Error during stop after dependency crash: ${e?.message || e}`,
-				);
 			}
 			return;
 		}
@@ -722,25 +511,18 @@ export class ProcessManager implements ProcessManagerI {
 		if (currentRetries < this.maxRetries) {
 			this.retryCount.set(id, currentRetries + 1);
 			this.emit('status:message', {
-				message: `Process ${id} crashed: ${error.message}. Retry ${currentRetries + 1
-					}/${this.maxRetries}`,
+				message: `Process ${id} crashed: ${error.message}. Retry ${
+					currentRetries + 1
+				}/${this.maxRetries}`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(
-				`Process ${id} crashed: ${error.message}. Retry ${currentRetries + 1}/${this.maxRetries
-				}`,
-			);
 			process.restart();
-			this.updateTui();
 			this.emitStateUpdate();
 		} else {
 			this.emit('status:message', {
 				message: `Process ${id} crashed too many times: ${error.message}. Stopping all processes.`,
 				timestamp: Date.now(),
 			});
-			this.tui?.showStatus?.(
-				`Process ${id} crashed too many times: ${error.message}. Stopping all processes.`,
-			);
 			if (this.crashReporter) {
 				const report = this.crashReporter.generateReport(
 					id,
@@ -766,23 +548,8 @@ export class ProcessManager implements ProcessManagerI {
 					message: `Error during stop after crash: ${e?.message || e}`,
 					timestamp: Date.now(),
 				});
-				this.tui?.showStatus?.(
-					`Error during stop after crash: ${e?.message || e}`,
-				);
 			}
 		}
-	}
-
-	private updateTui(): void {
-		if (!this.tui) return;
-
-		const processMap: ProcessMap = {
-			dependencies: this.dependencies,
-			main: this.mainProcesses,
-			cleanup: this.cleanupProcesses,
-		};
-
-		this.tui.render(processMap, this.tuiState);
 	}
 
 	private getProcessByIdAndType(
@@ -793,28 +560,6 @@ export class ProcessManager implements ProcessManagerI {
 		if (type === 'main') return this.mainProcesses.get(id);
 		if (type === 'cleanup') return this.cleanupProcesses.get(id);
 		return undefined;
-	}
-
-	private updateLiveLogsForSelectedProcess(): void {
-		if (!this.tuiState.selectedProcessId || !this.tuiState.selectedProcessType)
-			return;
-		const process = this.getProcessByIdAndType(
-			this.tuiState.selectedProcessId,
-			this.tuiState.selectedProcessType,
-		);
-		if (process) {
-			let logs = 'No logs available';
-			try {
-				logs = process.logger.getLogs();
-			} catch {
-				/* ignore */
-			}
-			this.tui?.showLogs?.(
-				this.tuiState.selectedProcessId,
-				this.tuiState.selectedProcessType,
-				logs,
-			);
-		}
 	}
 
 	private waitForPromiseWithTimeout<T>(

@@ -64,54 +64,36 @@ function makeMockProcess(id: string): ManagedProcessI {
 
 describe('ProcessManager.restartAll', () => {
 	let pm: ProcessManager;
-	let showStatus = vi.fn();
-	let render = vi.fn();
+	let statusMessages: string[] = [];
 
 	beforeEach(() => {
-		showStatus = vi.fn();
-		render = vi.fn();
+		statusMessages = [];
 		pm = new ProcessManager({
 			waitTime: 5,
-			tui: {
-				init: vi.fn(),
-				destroy: vi.fn(),
-				render: (p, s) => render(p, s),
-				onKeyPress: vi.fn(),
-				showLogs: vi.fn(),
-				showStatus: (m: string) => showStatus(m),
-				showInstructions: vi.fn(),
-				selectPrevious: vi.fn(),
-				selectNext: vi.fn(),
-			} as any,
+		});
+
+		pm.on('status:message', data => {
+			statusMessages.push(data.message);
 		});
 	});
 
-	it('restarts dependencies before main and does not destroy TUI', async () => {
+	it('restarts dependencies before main', async () => {
 		const depA = makeMockProcess('depA');
 		const mainA = makeMockProcess('mainA');
 		pm.addDependency('depA', depA);
 		pm.addMainProcess('mainA', mainA);
 
-		// start
 		pm.start();
 
-		// Wait a tick for ready promises
 		await new Promise(r => setTimeout(r, 5));
 
-		// Capture initial calls count
 		const depStartCalls = (depA.start as any).mock.calls.length;
 		const mainStartCalls = (mainA.start as any).mock.calls.length;
 
 		pm.restartAll();
 
-		// Advance timers
 		await new Promise(r => setTimeout(r, 50));
 
-		// Should not call destroy
-		const tui = pm['tui'] as any;
-		expect(tui.destroy).not.toHaveBeenCalled();
-
-		// Starts should have increased
 		expect((depA.start as any).mock.calls.length).toBeGreaterThan(
 			depStartCalls,
 		);
@@ -119,18 +101,18 @@ describe('ProcessManager.restartAll', () => {
 			mainStartCalls,
 		);
 
-		// Status messages sequence contains staged phases
-		const messages = showStatus.mock.calls.map(c => c[0]);
 		expect(
-			messages.some((m: string) =>
+			statusMessages.some((m: string) =>
 				m.toLowerCase().includes('starting dependencies'),
 			),
 		).toBe(true);
 		expect(
-			messages.some((m: string) => m.toLowerCase().includes('starting main')),
+			statusMessages.some((m: string) =>
+				m.toLowerCase().includes('starting main'),
+			),
 		).toBe(true);
 		expect(
-			messages.some((m: string) => m.includes('All processes restarted')),
+			statusMessages.some((m: string) => m.includes('All processes restarted')),
 		).toBe(true);
 	});
 });
