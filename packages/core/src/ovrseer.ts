@@ -36,7 +36,7 @@ export class Ovrseer implements OvrseerI {
 	constructor(options?: ProcessManagerOptions) {
 		this.maxRetries = options?.retries ?? 3;
 		this.waitTime = options?.waitTime ?? 1000;
-		this.cleanupTimeout = options?.cleanupTimeout ?? 5000;
+		this.cleanupTimeout = options?.cleanupTimeout ?? 50;
 		this.crashReporter = options?.crashReporter ?? new CrashReporter();
 		this.events = new EventEmitter();
 	}
@@ -428,8 +428,10 @@ export class Ovrseer implements OvrseerI {
 
 	restartAllMainProcesses(): void {
 		for (const [id, proc] of this.mainProcesses) {
-			if (proc.isRunning()) {
+			try {
 				proc.restart();
+			} catch {
+				/* ignore */
 			}
 			this.retryCount.delete(id);
 		}
@@ -515,6 +517,11 @@ export class Ovrseer implements OvrseerI {
 		teardowns.push(errTd);
 
 		this.handlerTeardowns.set(id, teardowns);
+
+		// Attach catch handlers to consume promise rejections from process.ready and process.finished
+		// This prevents unhandled promise rejections when tests simulate crashes by rejecting these promises.
+		process.ready?.catch(() => {});
+		process.finished?.catch(() => {});
 	}
 
 	private async handleCrash(

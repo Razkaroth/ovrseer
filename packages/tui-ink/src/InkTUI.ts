@@ -83,12 +83,34 @@ export class InkTUI extends InkTUIWrapper {
 		addHandler('process:added', ((
 			data: ProcessManagerEvents['process:added'],
 		) => {
+			try {
+				if (!this.manager) return;
+				if (data.type === 'dependency') {
+					const p = (this.manager as any).getDependency?.(data.id);
+					if (p) this.managedProcesses.dependencies.set(data.id, p);
+				} else if (data.type === 'main') {
+					const p = (this.manager as any).getMainProcess?.(data.id);
+					if (p) this.managedProcesses.main.set(data.id, p);
+				} else if (data.type === 'cleanup') {
+					const p = (this.manager as any).getCleanupProcess?.(data.id);
+					if (p) this.managedProcesses.cleanup.set(data.id, p);
+				}
+			} catch (_e) {}
 			this.render(this.managedProcesses, this.managedState);
 		}) as any);
 
 		addHandler('process:removed', ((
 			data: ProcessManagerEvents['process:removed'],
 		) => {
+			try {
+				if (data.type === 'dependency') {
+					this.managedProcesses.dependencies.delete(data.id);
+				} else if (data.type === 'main') {
+					this.managedProcesses.main.delete(data.id);
+				} else if (data.type === 'cleanup') {
+					this.managedProcesses.cleanup.delete(data.id);
+				}
+			} catch (_e) {}
 			this.render(this.managedProcesses, this.managedState);
 		}) as any);
 
@@ -257,10 +279,48 @@ export class InkTUI extends InkTUIWrapper {
 	}
 
 	private getProcessByIdAndType(id: string, type: string) {
-		if (type === 'dependency')
-			return this.managedProcesses.dependencies.get(id);
-		if (type === 'main') return this.managedProcesses.main.get(id);
-		if (type === 'cleanup') return this.managedProcesses.cleanup.get(id);
+		if (type === 'dependency') {
+			const existing = this.managedProcesses.dependencies.get(id);
+			if (existing) return existing;
+			if (this.manager && typeof (this.manager as any).getDependency === 'function') {
+				try {
+					const p = (this.manager as any).getDependency(id);
+					if (p) {
+						this.managedProcesses.dependencies.set(id, p);
+						return p;
+					}
+				} catch {}
+			}
+			return undefined;
+		}
+		if (type === 'main') {
+			const existing = this.managedProcesses.main.get(id);
+			if (existing) return existing;
+			if (this.manager && typeof (this.manager as any).getMainProcess === 'function') {
+				try {
+					const p = (this.manager as any).getMainProcess(id);
+					if (p) {
+						this.managedProcesses.main.set(id, p);
+						return p;
+					}
+				} catch {}
+			}
+			return undefined;
+		}
+		if (type === 'cleanup') {
+			const existing = this.managedProcesses.cleanup.get(id);
+			if (existing) return existing;
+			if (this.manager && typeof (this.manager as any).getCleanupProcess === 'function') {
+				try {
+					const p = (this.manager as any).getCleanupProcess(id);
+					if (p) {
+						this.managedProcesses.cleanup.set(id, p);
+						return p;
+					}
+				} catch {}
+			}
+			return undefined;
+		}
 		return undefined;
 	}
 
