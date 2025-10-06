@@ -65,7 +65,7 @@ describe('ProcessUnit', () => {
 		stubProc = Object.assign(procEmitter, {
 			stdout: stubStdout,
 			stderr: stubStderr,
-			kill: vi.fn(),
+			kill: vi.fn(() => true),
 			pid: 1234,
 		});
 
@@ -381,10 +381,16 @@ describe('ProcessUnit', () => {
 	});
 
 	describe('stop()', () => {
-		it('should error if process is not running', () => {
+		it('should warn if process is not running', async () => {
 			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+			const warnSpy = vi.spyOn(console, 'warn');
 
-			expect(() => process.stop()).toThrow();
+			await expect(process.stop()).rejects.toThrow();
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				'Tried to stop a process that is not running.',
+			);
+			warnSpy.mockRestore();
 		});
 
 		it('should set status to stopping immediately', () => {
@@ -412,19 +418,18 @@ describe('ProcessUnit', () => {
 			vi.useFakeTimers();
 			const process = createProcessUnit('sleep', ['10'], [], mockLogger);
 
-			// Spy on the kill method properly
-			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
-				// Mock implementation to avoid actual killing
-			});
+			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
 
 			process.start();
 
-			process.stop(100);
+			const stopPromise = process.stop(100);
 
-			// Advance timers to trigger timeout
-			vi.advanceTimersByTime(101);
+			await vi.advanceTimersByTimeAsync(101);
 
 			expect(killSpy).toHaveBeenCalled();
+
+			stubProc.emit('exit', null, 'SIGKILL');
+			await stopPromise.catch(() => {});
 
 			vi.useRealTimers();
 		});

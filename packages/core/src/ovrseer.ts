@@ -28,6 +28,7 @@ export class Ovrseer implements OvrseerI {
 	private waitTime: number;
 	private cleanupTimeout: number;
 	private isRunning = false;
+	private handlerTeardowns: Map<string, (() => void)[]> = new Map();
 
 	public readonly crashReporter?: CrashReporterI;
 	public readonly events: EventEmitter;
@@ -94,6 +95,17 @@ export class Ovrseer implements OvrseerI {
 	}
 
 	removeDependency(id: string): void {
+		const teardowns = this.handlerTeardowns.get(id);
+		if (teardowns) {
+			for (const td of teardowns) {
+				try {
+					td();
+				} catch {
+					/* ignore */
+				}
+			}
+			this.handlerTeardowns.delete(id);
+		}
 		this.dependencies.delete(id);
 		this.emit('process:removed', {
 			id,
@@ -112,6 +124,17 @@ export class Ovrseer implements OvrseerI {
 	}
 
 	removeMainProcess(id: string): void {
+		const teardowns = this.handlerTeardowns.get(id);
+		if (teardowns) {
+			for (const td of teardowns) {
+				try {
+					td();
+				} catch {
+					/* ignore */
+				}
+			}
+			this.handlerTeardowns.delete(id);
+		}
 		this.mainProcesses.delete(id);
 		this.emit('process:removed', {
 			id,
@@ -137,6 +160,17 @@ export class Ovrseer implements OvrseerI {
 	}
 
 	removeCleanupProcess(id: string): void {
+		const teardowns = this.handlerTeardowns.get(id);
+		if (teardowns) {
+			for (const td of teardowns) {
+				try {
+					td();
+				} catch {
+					/* ignore */
+				}
+			}
+			this.handlerTeardowns.delete(id);
+		}
 		this.cleanupProcesses.delete(id);
 		this.cleanupOrder = this.cleanupOrder.filter(id_ => id_ !== id);
 		this.emit('process:removed', {
@@ -406,7 +440,21 @@ export class Ovrseer implements OvrseerI {
 		process: ProcessUnitI,
 		type: TUIProcessType,
 	): void {
-		process.onCrash(async err => {
+		// If there are existing teardowns for this process, call them first
+		const existing = this.handlerTeardowns.get(id);
+		if (existing) {
+			for (const td of existing) {
+				try {
+					td();
+				} catch {
+					/* ignore */
+				}
+			}
+		}
+
+		const teardowns: Array<() => void> = [];
+
+		const crashTd = process.onCrash(async err => {
 			try {
 				await this.handleCrash(id, process, type, err);
 			} catch (e: any) {
@@ -416,8 +464,9 @@ export class Ovrseer implements OvrseerI {
 				});
 			}
 		});
+		teardowns.push(crashTd);
 
-		process.onExit((code, signal) => {
+		const exitTd = process.onExit((code, signal) => {
 			this.emit('process:stopped', {
 				id,
 				type,
@@ -431,8 +480,9 @@ export class Ovrseer implements OvrseerI {
 			});
 			this.emitStateUpdate();
 		});
+		teardowns.push(exitTd);
 
-		process.onReady(() => {
+		const readyTd = process.onReady(() => {
 			this.emit('process:ready', {id, type, timestamp: Date.now()});
 			this.emit('status:message', {
 				message: `Process ${id} is ready`,
@@ -440,8 +490,9 @@ export class Ovrseer implements OvrseerI {
 			});
 			this.emitStateUpdate();
 		});
+		teardowns.push(readyTd);
 
-		process.logger.onLog(message => {
+		const logTd = process.logger.onLog(message => {
 			this.emit('process:log', {
 				id,
 				type,
@@ -450,8 +501,9 @@ export class Ovrseer implements OvrseerI {
 				timestamp: Date.now(),
 			});
 		});
+		teardowns.push(logTd);
 
-		process.logger.onError(message => {
+		const errTd = process.logger.onError(message => {
 			this.emit('process:log', {
 				id,
 				type,
@@ -460,6 +512,9 @@ export class Ovrseer implements OvrseerI {
 				timestamp: Date.now(),
 			});
 		});
+		teardowns.push(errTd);
+
+		this.handlerTeardowns.set(id, teardowns);
 	}
 
 	private async handleCrash(

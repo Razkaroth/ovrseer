@@ -27,9 +27,9 @@ export interface ProcessUnitI {
 	// Event-like methods for lifecycle hooks
 	onExit(
 		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
-	): void;
-	onCrash(callback: (error: Error) => void): void;
-	onReady(callback: () => void): void;
+	): () => void;
+	onCrash(callback: (error: Error) => void): () => void;
+	onReady(callback: () => void): () => void;
 }
 
 export type StopSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';

@@ -284,18 +284,33 @@ export class ProcessUnit {
 		});
 	}
 
-	onReady(callback: () => void): void {
+	onReady(callback: () => void): () => void {
 		this._onReadyCallbacks.push(callback);
+		return () => {
+			this._onReadyCallbacks = this._onReadyCallbacks.filter(
+				cb => cb !== callback,
+			);
+		};
 	}
 
 	onExit(
 		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
-	): void {
+	): () => void {
 		this._onExitCallbacks.push(callback);
+		return () => {
+			this._onExitCallbacks = this._onExitCallbacks.filter(
+				cb => cb !== callback,
+			);
+		};
 	}
 
-	onCrash(callback: (error: Error) => void): void {
+	onCrash(callback: (error: Error) => void): () => void {
 		this._onCrashCallbacks.push(callback);
+		return () => {
+			this._onCrashCallbacks = this._onCrashCallbacks.filter(
+				cb => cb !== callback,
+			);
+		};
 	}
 
 	async stop(
