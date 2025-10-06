@@ -238,8 +238,28 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		(input, key) => {
 			if (!onKeyPress) return;
 
+			if (state.inputMode) {
+				if (key.escape) {
+					onKeyPress('input-cancel');
+				} else if (key.return) {
+					onKeyPress('input-submit');
+				} else if (key.ctrl && input === 's') {
+					onKeyPress('input-toggle-secret');
+				} else if (key.backspace || key.delete) {
+					onKeyPress('input-backspace');
+				} else if (input && input.length === 1 && !key.ctrl && !key.meta) {
+					onKeyPress('input-char', {
+						processInfo: undefined,
+						index: input.charCodeAt(0),
+					});
+				}
+				return;
+			}
+
 			if (input === 'q' || (key.ctrl && input === 'c')) {
 				onKeyPress(key.ctrl && input === 'c' ? 'C-c' : 'q');
+			} else if (input === 'i') {
+				onKeyPress('i');
 			} else if (input === 's') {
 				onKeyPress('s');
 			} else if (input === 'r') {
@@ -438,6 +458,26 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					logEntries.length,
 			  )}/${logEntries.length}]`
 			: '';
+
+	const renderInputField = () => {
+		if (!state.inputMode) return null;
+		const displayValue = state.inputSecretMode
+			? '*'.repeat(state.inputValue?.length ?? 0)
+			: state.inputValue ?? '';
+		const modeLabel = state.inputSecretMode ? 'Secret Input' : 'Input';
+		return (
+			<Box borderStyle="single" borderColor="yellow" paddingX={1}>
+				<Text bold color="yellow">
+					{modeLabel}:{' '}
+				</Text>
+				<Text>{displayValue}</Text>
+				<Text dimColor>
+					{' '}
+					(Enter: submit, Esc: cancel, Ctrl+S: toggle secret)
+				</Text>
+			</Box>
+		);
+	};
 
 	return (
 		<Box flexDirection="column" width={terminalWidth} height={terminalHeight}>
@@ -683,10 +723,12 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 			</Box>
 
 			<Box flexDirection="column">
+				{renderInputField()}
 				<Box borderStyle="single" borderColor="gray" paddingX={1}>
 					<Text dimColor>
-						J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail | enter
-						logs | f toggle flags | r restart | R/C-r restart all | q quit
+						i input | J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail
+						| enter logs | f toggle flags | r restart | R/C-r restart all | q
+						quit
 					</Text>
 				</Box>
 				<Box borderStyle="single" borderColor="cyan" paddingX={1}>

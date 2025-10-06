@@ -276,6 +276,9 @@ export interface TUIState {
 	selectedFlagNode?: string;
 	expandedFlagNodes?: Set<string>;
 	matchContextVisible?: Set<string>;
+	inputMode?: boolean;
+	inputValue?: string;
+	inputSecretMode?: boolean;
 }
 
 export interface TUIKeyPressMeta {

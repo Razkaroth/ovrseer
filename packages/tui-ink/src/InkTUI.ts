@@ -178,7 +178,56 @@ export class InkTUI extends InkTUIWrapper {
 		}) as any);
 
 		this.onKeyPress(async (key: string, meta?: TUIKeyPressMeta) => {
-			if (key === 'q' || key === 'C-c') {
+			if (key === 'i') {
+				this.managedState.inputMode = true;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-cancel') {
+				this.managedState.inputMode = false;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-submit') {
+				const inputValue = this.managedState.inputValue ?? '';
+				const isSecret = this.managedState.inputSecretMode ?? false;
+				if (
+					this.managedState.selectedProcessId &&
+					this.managedState.selectedProcessType &&
+					this.manager
+				) {
+					const process = this.getProcessByIdAndType(
+						this.managedState.selectedProcessId,
+						this.managedState.selectedProcessType,
+					);
+					if (process && typeof (process as any).sendStdin === 'function') {
+						try {
+							(process as any).sendStdin(inputValue, isSecret);
+							this.showStatus(
+								`Sent input to ${this.managedState.selectedProcessId}`,
+							);
+						} catch (e: any) {
+							this.showStatus(`Failed to send input: ${e.message}`);
+						}
+					}
+				}
+				this.managedState.inputMode = false;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-toggle-secret') {
+				this.managedState.inputSecretMode = !this.managedState.inputSecretMode;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-backspace') {
+				const currentValue = this.managedState.inputValue ?? '';
+				this.managedState.inputValue = currentValue.slice(0, -1);
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-char' && meta?.index !== undefined) {
+				const char = String.fromCharCode(meta.index);
+				this.managedState.inputValue =
+					(this.managedState.inputValue ?? '') + char;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'q' || key === 'C-c') {
 				if (this.manager) {
 					await this.manager.stop();
 				}

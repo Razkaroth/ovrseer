@@ -471,17 +471,17 @@ describe('InkTUI', () => {
 				{
 					type: 'info' as LogType,
 					content: 'Info message',
-					timestamp: Date.now(),
+					time: Date.now(),
 				},
 				{
 					type: 'error' as LogType,
 					content: 'Error message',
-					timestamp: Date.now(),
+					time: Date.now(),
 				},
 				{
 					type: 'warn' as LogType,
 					content: 'Warning message',
-					timestamp: Date.now(),
+					time: Date.now(),
 				},
 			];
 			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
@@ -507,12 +507,12 @@ describe('InkTUI', () => {
 				{
 					type: 'UserInput' as LogType,
 					content: 'normal input',
-					timestamp: Date.now(),
+					time: Date.now(),
 				},
 				{
 					type: 'UserInputSecret' as LogType,
 					content: 'secret password',
-					timestamp: Date.now(),
+					time: Date.now(),
 				},
 			];
 			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
@@ -534,7 +534,7 @@ describe('InkTUI', () => {
 		it('should call getTypedLogs on process:log event', () => {
 			const proc = new MockProcessUnit();
 			const mockTypedLogs: LogEntry[] = [
-				{type: 'info' as LogType, content: 'New log', timestamp: Date.now()},
+				{type: 'info' as LogType, content: 'New log', time: Date.now()},
 			];
 			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
 			mockManager.addMainProcess('main1', proc);
@@ -648,6 +648,134 @@ describe('InkTUI', () => {
 			expect(showStatusSpy).toHaveBeenCalledWith(
 				'Cleanup process cleanup1 timeout: Timeout',
 			);
+		});
+	});
+
+	describe('Input Mode', () => {
+		beforeEach(() => {
+			tui.attachToManager(mockManager);
+		});
+
+		it('should enter input mode on "i" key', () => {
+			const renderSpy = vi.spyOn(tui, 'render');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('i', undefined);
+			}
+
+			expect(renderSpy).toHaveBeenCalled();
+		});
+
+		it('should cancel input mode on escape', () => {
+			const renderSpy = vi.spyOn(tui, 'render');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('i', undefined);
+				callback('input-cancel', undefined);
+			}
+
+			expect(renderSpy).toHaveBeenCalled();
+		});
+
+		it('should toggle secret mode on Ctrl+S', () => {
+			const renderSpy = vi.spyOn(tui, 'render');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('i', undefined);
+				callback('input-toggle-secret', undefined);
+			}
+
+			expect(renderSpy).toHaveBeenCalled();
+		});
+
+		it('should handle backspace in input mode', () => {
+			const renderSpy = vi.spyOn(tui, 'render');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('i', undefined);
+				callback('input-char', {index: 65});
+				callback('input-backspace', undefined);
+			}
+
+			expect(renderSpy).toHaveBeenCalled();
+		});
+
+		it('should submit input to selected process', () => {
+			const proc = new MockProcessUnit();
+			(proc as any).sendStdin = vi.fn();
+			mockManager.addMainProcess('main1', proc);
+
+			const showStatusSpy = vi.spyOn(tui, 'showStatus');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
+				callback('i', undefined);
+				callback('input-char', {index: 72});
+				callback('input-char', {index: 105});
+				callback('input-submit', undefined);
+			}
+
+			expect((proc as any).sendStdin).toHaveBeenCalled();
+			expect(showStatusSpy).toHaveBeenCalledWith('Sent input to main1');
+		});
+
+		it('should submit secret input correctly', () => {
+			const proc = new MockProcessUnit();
+			(proc as any).sendStdin = vi.fn();
+			mockManager.addMainProcess('main1', proc);
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
+				callback('i', undefined);
+				callback('input-toggle-secret', undefined);
+				callback('input-char', {index: 112});
+				callback('input-char', {index: 97});
+				callback('input-char', {index: 115});
+				callback('input-char', {index: 115});
+				callback('input-submit', undefined);
+			}
+
+			expect((proc as any).sendStdin).toHaveBeenCalledWith('pass', true);
+		});
+
+		it('should handle input without selected process', () => {
+			const showStatusSpy = vi.spyOn(tui, 'showStatus');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+
+			if (typeof callback === 'function') {
+				callback('i', undefined);
+				callback('input-char', {index: 65});
+				callback('input-submit', undefined);
+			}
+
+			expect(showStatusSpy).not.toHaveBeenCalled();
 		});
 	});
 });
