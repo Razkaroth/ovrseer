@@ -1,40 +1,129 @@
 # Suggested Commands for Ovrseer Development
 
 ## Build Commands
-- `turbo run build` - Build all packages in the monorepo
-- `cd packages/core && tsc` - Build only core package
-- `cd packages/tui-ink && tsc` - Build only tui-ink package
+```bash
+# Build all packages (from root)
+turbo run build
+# or
+npm run build
+# or
+pnpm build
 
-## Development Commands
-- `turbo run dev` - Start watch mode for all packages
-- `pnpm --filter @ovrseer/example dev` - Run the example application
+# Build individual package
+cd packages/core && npm run build
+cd packages/tui-ink && npm run build
+```
 
-## Testing Commands
-- `turbo run test` - Run all tests across packages
-- `cd packages/core && vitest` - Run core package tests in watch mode
-- `cd packages/core && vitest run` - Run core package tests once
-- `cd packages/core && vitest run src/__tests__/logger.test.ts` - Run specific test file
+## Development/Watch Mode
+```bash
+# Watch all packages (from root)
+turbo run dev
+# or
+npm run dev
 
-## Linting & Formatting
-- `turbo run lint` - Check formatting with Prettier (and XO if configured)
-- `prettier --check .` - Check formatting
-- `prettier --write .` - Auto-fix formatting
+# Watch individual package
+cd packages/core && npm run dev
+cd packages/tui-ink && npm run dev
+```
+
+## Testing
+```bash
+# Run all tests (from root)
+turbo run test
+# or
+npm test
+
+# Run tests for specific package
+cd packages/core && npm test
+cd packages/tui-ink && npm test
+
+# Run a single test file
+cd packages/core && npx vitest run src/__tests__/logger.test.ts
+cd packages/tui-ink && npx vitest run src/__tests__/InkTUI-flags.test.ts
+
+# Watch mode for tests
+cd packages/core && npx vitest
+```
+
+## Linting and Formatting
+```bash
+# Run linter on all packages (from root)
+turbo run lint
+# or
+npm run lint
+
+# Lint individual package
+cd packages/core && npm run lint
+cd packages/tui-ink && npm run lint
+
+# Fix formatting issues (if supported)
+cd packages/core && prettier --write .
+cd packages/tui-ink && prettier --write .
+```
+
+## Running the Example
+```bash
+# Run the example package
+npm run example
+# or
+pnpm --filter @ovrseer/example dev
+```
 
 ## Package Management
-- `pnpm install` - Install dependencies (preferred)
-- `npm install` - Alternative package manager
-- `bun install` - Alternative package manager
+```bash
+# Install dependencies (from root)
+pnpm install
+
+# Add dependency to specific package
+pnpm --filter @ovrseer/core add <package-name>
+pnpm --filter @ovrseer/tui-ink add <package-name>
+
+# Add dev dependency
+pnpm --filter @ovrseer/core add -D <package-name>
+```
+
+## Git Commands
+```bash
+# Standard git workflow
+git status
+git add <files>
+git commit -m "message"
+git push
+
+# View recent commits
+git log --oneline -n 10
+
+# View diff
+git diff
+git diff --staged
+```
 
 ## System Commands (Linux)
-- `ls` - List files
-- `cd` - Change directory
-- `grep` - Search in files (prefer `rg` ripgrep if available)
-- `find` - Find files
-- `git` - Version control
+- `ls` - list files
+- `cd <dir>` - change directory
+- `cat <file>` - view file contents
+- `grep <pattern> <file>` - search for pattern in file
+- `find <dir> -name <pattern>` - find files by name
+- `rg <pattern>` - ripgrep (faster alternative to grep)
 
-## Task Completion Checklist
-When completing a task:
-1. Run `turbo run build` to ensure no build errors
-2. Run `turbo run lint` to check code formatting
-3. Run `turbo run test` to verify all tests pass
-4. Check git status before committing
+## Turborepo Specific
+```bash
+# Run task for specific package
+turbo run build --filter=@ovrseer/core
+turbo run test --filter=@ovrseer/tui-ink
+
+# Clear turbo cache
+turbo run build --force
+```
+
+## Common Workflows
+
+### After making code changes:
+1. `turbo run lint` - check formatting
+2. `turbo run build` - ensure it compiles
+3. `turbo run test` - ensure tests pass
+
+### Before committing:
+1. Run lint, build, and test
+2. Review changes with `git diff`
+3. Commit with descriptive message

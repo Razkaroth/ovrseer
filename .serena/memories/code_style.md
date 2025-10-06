@@ -1,40 +1,62 @@
-# Code Style and Conventions
+# Ovrseer Code Style and Conventions
 
-## Formatting (Prettier via @vdemedes/prettier-config)
-- **Indentation:** Tabs (not spaces)
-- **Semicolons:** Required at end of statements
-- **Quotes:** Single quotes for strings
-- **Bracket Spacing:** None - use `{foo}` not `{ foo }`
-- **Arrow Function Parens:** Avoid when possible - `x => x` not `(x) => x`
-- **Trailing Commas:** Everywhere (arrays, objects, function params)
+## Formatting
+- **Formatter**: Prettier via `@vdemedes/prettier-config`
+- **Indentation**: TABS (not spaces) - enforced by .editorconfig
+- **Semicolons**: Required (always use semicolons)
+- **Quotes**: Single quotes for strings
+- **Bracket Spacing**: No spacing (`{foo}` not `{ foo }`)
+- **Arrow Function Parens**: Avoid when possible (`x => x` not `(x) => x`)
+- **Trailing Commas**: Everywhere (ES5+)
+- **Line Endings**: LF (Unix-style)
+- **Final Newline**: Always insert final newline
+
+## Linting
+- **Linter**: XO (ESLint with opinionated defaults)
+- Extends `@sindresorhus/tsconfig` for strict TypeScript
 
 ## TypeScript Conventions
-- **Imports:** ES6 imports with `.js` extensions (e.g., `import {Foo} from './types.js'`)
-- **Type Annotations:** Explicit types for function parameters and return values
-- **TSConfig:** Extends `@sindresorhus/tsconfig`
-- **Module System:** ES Modules (`"type": "module"`)
+- **Module System**: ES modules (type: "module" in package.json)
+- **Import Extensions**: Always use `.js` extension in imports (e.g., `import {Foo} from './types.js'`)
+- **Types**: Explicit types for function parameters and return values
+- **Strictness**: Strict mode enabled (via @sindresorhus/tsconfig)
 
 ## Naming Conventions
-- **Classes:** PascalCase (e.g., `ProcessManager`, `ManagedProcess`)
-- **Functions/Variables:** camelCase (e.g., `startProcess`, `logBuffer`)
-- **Constants:** UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`, `DEFAULT_PORT`)
-- **Interfaces:** PascalCase with `I` suffix (e.g., `ProcessManagerI`, `ManagedProcessI`)
+- **Classes**: PascalCase (e.g., `ProcessUnit`, `ProcessLogger`)
+- **Functions/Variables**: camelCase (e.g., `getStatus`, `selectedIndex`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `MAX_LOG_LINES`)
+- **Interfaces**: PascalCase with `I` suffix (e.g., `ProcessUnitI`)
+- **Types**: PascalCase (e.g., `TUIState`, `ProcessMap`)
 
 ## Error Handling
 - Use try/catch blocks for error handling
-- Prefer explicit error types: `catch (e: any)` or proper error type casting
-- Handle errors gracefully at appropriate levels
+- Prefer explicit error types in catch blocks (e.g., `catch (e: any)`)
+- Log errors appropriately using the ProcessLogger or console
 
-## Code Organization
-- **No Comments:** Per codebase convention, code should be self-documenting
-- **File Structure:** One main export per file typically
-- **Exports:** Named exports preferred, collected in `index.ts` barrel files
+## Comments
+- **IMPORTANT**: NO comments in code (per codebase convention)
+- Code should be self-documenting
+- Only exception: complex algorithm explanations if absolutely necessary
 
-## Testing
-- **Framework:** Vitest
-- **Location:** `__tests__/` directories within `src/`
-- **Mocks:** Shared mocks in `__tests__/mocks.ts`
+## File Structure
+- Exports at the top level of `index.ts` files
+- Tests in `__tests__/` directories
+- One main export per file (class or function)
 
-## Linting
-- **Tool:** XO linter
-- **Rules:** Extends `@sindresorhus/tsconfig` standards
+## React/Ink Conventions (for tui-ink package)
+- Functional components using hooks (useState, useEffect, useMemo, useInput)
+- PascalCase for component names (e.g., `InkTUIRenderer`)
+- Props types defined inline or as separate type aliases
+- Memoization with useMemo for expensive computations (but avoid stale dependencies)
+
+## Import Order
+1. External dependencies (e.g., React, Ink)
+2. Internal package dependencies (e.g., @ovrseer/core)
+3. Relative imports (e.g., ./types.js, ./logger.js)
+
+## Best Practices
+- Keep functions focused and single-purpose
+- Prefer composition over inheritance
+- Use TypeScript's type system to catch errors at compile time
+- Write tests for all core logic (vitest)
+- Follow existing patterns in the codebase when adding new features

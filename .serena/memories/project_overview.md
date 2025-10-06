@@ -1,32 +1,65 @@
 # Ovrseer Project Overview
 
 ## Purpose
-Ovrseer is a node-based process manager with a Terminal User Interface (TUI). It allows managing and monitoring multiple processes with features like crash reporting, logging, and interactive terminal interface.
+Ovrseer is a Node-based process manager with a Terminal User Interface (TUI). It provides process lifecycle management, logging, crash reporting, and an interactive terminal UI for monitoring and controlling processes.
 
 ## Tech Stack
-- **Language:** TypeScript (ES Modules with `.js` extensions in imports)
-- **Build Tool:** TypeScript compiler (`tsc`)
-- **Monorepo:** Turborepo with pnpm workspaces
-- **Testing:** Vitest
-- **Formatting:** Prettier via `@vdemedes/prettier-config`
-- **Linting:** XO (extends `@sindresorhus/tsconfig`)
-- **TUI Framework:** Ink (React for CLIs)
-- **Runtime:** Node.js >=16
+- **Language**: TypeScript (targeting ES modules)
+- **Build Tool**: Turborepo (monorepo orchestration)
+- **Package Manager**: pnpm (workspace-based monorepo)
+- **Testing**: Vitest
+- **Linting/Formatting**: Prettier + XO (ESLint config)
+- **UI Framework**: Ink (React for CLI) for the TUI package
+- **TypeScript Config**: Extends @sindresorhus/tsconfig
+- **Node Version**: >=16
 
-## Package Structure
-- **@ovrseer/core** - Core process management logic (ProcessManager, ManagedProcess, CrashReporter, Logger)
-- **@ovrseer/tui-ink** - Ink-based TUI renderer for interactive terminal interface
-- **@ovrseer/example** - Example usage
+## Monorepo Structure
+```
+ovrseer/
+├── packages/
+│   ├── core/           # @ovrseer/core - Core process manager logic
+│   │   ├── src/
+│   │   │   ├── types.ts           # Shared types
+│   │   │   ├── logger.ts          # ProcessLogger (ring buffer logging)
+│   │   │   ├── process-unit.ts    # ProcessUnit (individual process)
+│   │   │   ├── ovrseer.ts         # Ovrseer (main manager)
+│   │   │   ├── crash-reporter.ts  # CrashReporter
+│   │   │   └── index.ts           # Package exports
+│   │   ├── __tests__/             # Vitest tests
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── tui-ink/        # @ovrseer/tui-ink - Ink-based TUI renderer
+│   │   ├── src/
+│   │   │   ├── types.ts              # TUI types
+│   │   │   ├── InkTUIRenderer.tsx    # React/Ink UI component
+│   │   │   ├── InkTUI.ts             # TUI event handler/state manager
+│   │   │   ├── InkTUIWrapper.ts      # Wrapper for integration
+│   │   │   └── index.ts              # Package exports
+│   │   ├── __tests__/                # Vitest tests
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── example/        # @ovrseer/example - Example usage
+├── prototype/          # Original prototype (reference only)
+├── turbo.json          # Turborepo config
+├── pnpm-workspace.yaml # pnpm workspace config
+└── package.json        # Root package.json
+```
 
-## Key Components
-1. **ProcessManager** - Orchestrates all managed processes
-2. **ManagedProcess** - Wraps a single process with lifecycle management
-3. **CrashReporter** - Handles crash detection and reporting
-4. **SimpleLogger** - Circular buffer logger for process output
-5. **InkTUIWrapper** - Wraps Ink rendering for TUI
-6. **InkTUIRenderer** - React component for TUI display
+## Key Packages
+- **@ovrseer/core**: Exports `Ovrseer`, `ProcessUnit`, `ProcessLogger`, `CrashReporter`, and types.
+- **@ovrseer/tui-ink**: Exports `InkTUI`, `InkTUIWrapper`, `InkTUIRenderer` and TUI-specific types.
+- **@ovrseer/example**: Example application using both core and TUI packages.
 
-## Entry Points
-- Core package: `packages/core/src/index.ts`
-- TUI package: `packages/tui-ink/src/index.ts`
-- Example: `packages/example/src/index.ts`
+## Core Concepts
+- **Ovrseer**: Main process manager coordinating multiple ProcessUnits.
+- **ProcessUnit**: Represents a single managed process with lifecycle methods (start, stop, restart).
+- **ProcessLogger**: Ring-buffer logger with flag support (pattern-based log matching).
+- **CrashReporter**: Tracks process crashes and restart attempts.
+- **InkTUI**: TUI state manager handling user input and rendering state.
+- **InkTUIRenderer**: React/Ink component rendering the process list, logs, and flags.
+
+## Development Workflow
+- Development is done in a monorepo using Turborepo for task orchestration.
+- Packages depend on each other via workspace protocol (`workspace:*`).
+- Build outputs go to `dist/` directories.
+- Tests are colocated in `__tests__/` directories within each package.
