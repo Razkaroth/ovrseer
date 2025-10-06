@@ -79,7 +79,7 @@ Each ProcessUnit is independent but coordinated by Ovrseer.
 - **Delimiter handling**: Splits streams by delimiter (default `\n`) to detect complete lines
 - **Flag matching**: Tests each line against registered regex patterns
 - **Context windows**: Captures surrounding lines when a flag matches
-- **Event emission**: Emits `log` and `flag-match` events
+- **Event emission**: Emits `log` and `flag:matched` events
 
 Flags can have **target counts**—if a flag matches more times than its target, it's considered "exceeded" and highlighted in the TUI.
 

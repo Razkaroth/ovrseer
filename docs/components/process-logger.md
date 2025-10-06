@@ -66,7 +66,7 @@ logger.addChunk('ERROR: Connection refused\n', true);
 2. Add each line to circular buffer
 3. Test each line against all flags
 4. Emit `log` or `error` event for each line
-5. If flag matches, emit `flag-match` event with context
+5. If flag matches, emit `flag:matched` event with context
 
 ### Log Retrieval
 
