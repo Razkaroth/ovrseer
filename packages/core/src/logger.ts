@@ -47,11 +47,29 @@ export class ProcessLogger implements ProcessLoggerI {
 
 	public addChunk(chunk: string, isError?: boolean) {
 		this._buffer.push(chunk);
-		const logIndex = this._buffer.length - 1;
+
+		// If buffer exceeds max size, evict the oldest entry first and
+		// adjust stored match indices so they remain consistent with the
+		// shifted buffer (decrement indices by 1 and drop any that go < 0).
 		if (this._buffer.length > this._maxBufferSize) {
 			this._buffer.shift();
+			for (const [_name, flagState] of this._flags) {
+				const newMatches: FlagMatch[] = [];
+				for (const match of flagState.matches) {
+					const newIndex = match.logIndex - 1;
+					if (newIndex >= 0) {
+						match.logIndex = newIndex;
+						newMatches.push(match);
+					} else {
+						// match was evicted from the buffer; decrement count defensively
+						flagState.count = Math.max(0, flagState.count - 1);
+					}
+				}
+				flagState.matches = newMatches;
+			}
 		}
 
+		const logIndex = this._buffer.length - 1;
 		this._checkFlags(chunk, logIndex);
 
 		if (isError) {
