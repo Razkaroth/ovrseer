@@ -1,7 +1,10 @@
 import {spawn, ChildProcess} from 'child_process';
-import {ProcessLoggerI, ProcessStatus, ReadyCheck} from './types.js';
-
-type StopSignal = NodeJS.Signals;
+import {
+	ProcessLoggerI,
+	ProcessStatus,
+	ReadyCheck,
+	StopSignal,
+} from './types.js';
 
 export class ProcessUnit {
 	private _process: ChildProcess | null = null;
