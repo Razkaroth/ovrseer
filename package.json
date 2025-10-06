@@ -27,5 +27,9 @@
 		"node": ">=16"
 	},
 	"packageManager": "pnpm@10.12.1",
-	"prettier": "@vdemedes/prettier-config"
+	"prettier": "@vdemedes/prettier-config",
+	"author": {
+		"name": "Razkaroth",
+		"url": "https://github.com/Razkaroth"
+	}
 }

@@ -8,6 +8,10 @@
 		"url": "https://github.com/Razkaroth/ovrseer.git",
 		"directory": "packages/core"
 	},
+	"author": {
+		"name": "Razkaroth",
+		"url": "https://github.com/Razkaroth"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
