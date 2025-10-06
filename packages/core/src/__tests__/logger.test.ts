@@ -30,7 +30,10 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 
 			it('Should add a log chunk', () => {
 				loggerInstance.addChunk('test');
-				expect(loggerInstance._logs).toEqual(['test']);
+				expect(loggerInstance._logs).toHaveLength(1);
+				expect(loggerInstance._logs[0].content).toBe('test');
+				expect(loggerInstance._logs[0].type).toBe('log');
+				expect(loggerInstance._logs[0].time).toBeGreaterThan(0);
 			});
 
 			it('Should by default get the first maxLogSize logs', () => {

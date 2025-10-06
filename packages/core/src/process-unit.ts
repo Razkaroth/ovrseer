@@ -92,7 +92,7 @@ export class ProcessUnit {
 		}
 
 		this._process = spawn(this.command, this.args, {
-			stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout and stderr piped
+			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 
 		this._status = 'running';
@@ -438,5 +438,26 @@ export class ProcessUnit {
 
 	getStatus(): ProcessStatus {
 		return this._status;
+	}
+
+	sendStdin(input: string, secret: boolean = false): void {
+		if (!this._process || !this._process.stdin) {
+			throw new Error('Process stdin is not available');
+		}
+
+		if (!this.isRunning()) {
+			throw new Error('Cannot send stdin to a process that is not running');
+		}
+
+		try {
+			this._process.stdin.write(input + '\n');
+			this.logger.addChunk(
+				input,
+				false,
+				secret ? 'UserInputSecret' : 'UserInput',
+			);
+		} catch (error: any) {
+			throw new Error(`Failed to write to stdin: ${error.message}`);
+		}
 	}
 }

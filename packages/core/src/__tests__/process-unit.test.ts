@@ -540,4 +540,119 @@ describe('ProcessUnit', () => {
 			expect(process.process).not.toBeNull();
 		});
 	});
+
+	describe('sendStdin()', () => {
+		it('should throw if process is not started', () => {
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			expect(() => process.sendStdin('test input')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+
+		it('should write input to stdin and append newline', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('test input');
+
+			expect(mockStdin.write).toHaveBeenCalledWith('test input\n');
+		});
+
+		it('should log input as UserInput type by default', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('test input');
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLog = typedLogs.find(log => log.type === 'UserInput');
+
+			expect(userInputLog).toBeDefined();
+			expect(userInputLog!.content).toBe('test input');
+		});
+
+		it('should log input as UserInputSecret type when secret is true', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('secret password', true);
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const secretLog = typedLogs.find(log => log.type === 'UserInputSecret');
+
+			expect(secretLog).toBeDefined();
+			expect(secretLog!.content).toBe('secret password');
+		});
+
+		it('should handle multiple stdin writes', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('first input');
+			process.sendStdin('second input');
+			process.sendStdin('third input', true);
+
+			expect(mockStdin.write).toHaveBeenCalledTimes(3);
+			expect(mockStdin.write).toHaveBeenNthCalledWith(1, 'first input\n');
+			expect(mockStdin.write).toHaveBeenNthCalledWith(2, 'second input\n');
+			expect(mockStdin.write).toHaveBeenNthCalledWith(3, 'third input\n');
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLogs = typedLogs.filter(log => log.type === 'UserInput');
+			const secretLogs = typedLogs.filter(
+				log => log.type === 'UserInputSecret',
+			);
+
+			expect(userInputLogs).toHaveLength(2);
+			expect(secretLogs).toHaveLength(1);
+		});
+
+		it('should throw if stdin is null', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			stubProc.stdin = null;
+
+			process.start();
+
+			expect(() => process.sendStdin('test input')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+
+		it('should include timestamp in logged entry', async () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			const beforeTime = Date.now();
+			process.start();
+			process.sendStdin('test input');
+			const afterTime = Date.now();
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLog = typedLogs.find(log => log.type === 'UserInput');
+
+			expect(userInputLog).toBeDefined();
+			expect(userInputLog!.time).toBeGreaterThanOrEqual(beforeTime);
+			expect(userInputLog!.time).toBeLessThanOrEqual(afterTime);
+		});
+	});
 });
