@@ -44,21 +44,45 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run tests
+        run: pnpm -w run test
+
       - name: Build packages
         run: pnpm -w run build
 
-      - name: Publish packages
+      - name: Publish packages (monorepo-wide version)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+
+          # Determine tag and version (strip leading 'v' if present)
+          TAG="${GITHUB_REF##*/}"
+          VERSION="${TAG#v}"
+          echo "Detected tag: $TAG"
+          echo "Using version: $VERSION"
+
+          # Update package.json versions and replace internal workspace:* deps with the monorepo version
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              name=$(jq -r '.name' "$pkg/package.json")
+              echo "Setting $name version to $VERSION"
+              tmpfile=$(mktemp)
+              jq --arg v "$VERSION" '.version = $v' "$pkg/package.json" > "$tmpfile" && mv "$tmpfile" "$pkg/package.json"
+
+              # Replace workspace:* (or workspace:^, workspace:~) in dependencies and peerDependencies
+              tmpfile=$(mktemp)
+              jq --arg v "$VERSION" '(.dependencies // {}) |= with_entries( if (.value | test("^workspace:")) then .value = $v else . end) | (.peerDependencies // {}) |= with_entries( if (.value | test("^workspace:")) then .value = $v else . end)' "$pkg/package.json" > "$tmpfile" && mv "$tmpfile" "$pkg/package.json"
+            fi
+          done
+
+          # Publish non-private packages (skip if exact version already published)
           for pkg in packages/*; do
             if [ -f "$pkg/package.json" ]; then
               private=$(jq -r '.private // false' "$pkg/package.json")
               name=$(jq -r '.name' "$pkg/package.json")
               version=$(jq -r '.version' "$pkg/package.json")
               if [ "$private" != "true" ]; then
-                # Skip if this exact version is already on the registry
                 if npm view "$name@$version" version >/dev/null 2>&1; then
                   echo "Skipping already-published $name@$version"
                   continue
