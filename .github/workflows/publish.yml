@@ -72,7 +72,14 @@ jobs:
 
               # Replace workspace:* (or workspace:^, workspace:~) in dependencies and peerDependencies
               tmpfile=$(mktemp)
-              jq --arg v "$VERSION" '(.dependencies // {}) |= with_entries( if (.value | test("^workspace:")) then .value = $v else . end) | (.peerDependencies // {}) |= with_entries( if (.value | test("^workspace:")) then .value = $v else . end)' "$pkg/package.json" > "$tmpfile" && mv "$tmpfile" "$pkg/package.json"
+              jq --arg v "$VERSION" '
+                if .dependencies then
+                  .dependencies |= with_entries(if (.value | test("^workspace:")) then .value = $v else . end)
+                else . end |
+                if .peerDependencies then
+                  .peerDependencies |= with_entries(if (.value | test("^workspace:")) then .value = $v else . end)
+                else . end
+              ' "$pkg/package.json" > "$tmpfile" && mv "$tmpfile" "$pkg/package.json"
             fi
           done
 
