@@ -91,9 +91,14 @@ pm.on('process:ready', ({name, duration}) => {
 	metrics.timing('process.ready', duration, {process: name});
 });
 
-pm.on('process:crash', ({name, exitCode, signal}) => {
+pm.on('process:crash', ({name, report}) => {
 	sentry.captureException(new Error(`Process ${name} crashed`), {
-		extra: {exitCode, signal},
+		extra: {
+			message: report.errorMessage ?? undefined,
+			stack: report.errorStack ?? undefined,
+			logs: report.logs,
+			timestamp: report.timestamp,
+		},
 	});
 });
 
@@ -117,10 +122,10 @@ const pm = new Ovrseer({
 
 Crash reports are automatically generated with:
 
-- Exit code and signal
-- Last 50 log lines
-- Timestamp and process metadata
-- Persisted to disk for post-mortem analysis
+- Optional `errorMessage` and `errorStack` (if available)
+- `logs`: newline-separated string of recent log lines
+- `timestamp`: ISO 8601 string
+- Process metadata and persisted diagnostics for post-mortem analysis
 
 ### 🔍 Readiness Checks
 

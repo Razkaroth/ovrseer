@@ -1,10 +1,10 @@
 # CrashReporter - Crash Analysis and Reporting
 
-`CrashReporter` captures detailed information when processes crash, generating structured reports with exit codes, signals, recent logs, and metadata. The default implementation persists reports to disk for post-mortem analysis, but it's designed to be extended for integration with error tracking services.
+`CrashReporter` captures detailed information when processes crash, generating structured reports containing error messages, optional stack traces, concatenated logs, and metadata. The default implementation persists reports to disk for post-mortem analysis, but it's designed to be extended for integration with error tracking services.
 
 ## Core Features
 
-- **Structured Reports**: Exit codes, signals, timestamps, and recent logs
+- **Structured Reports**: Error messages, stack traces, timestamps, and logs
 - **Automatic Capture**: Triggered automatically by ProcessUnit on crash
 - **Disk Persistence**: JSON reports saved to temporary directory by default
 - **In-Memory Cache**: Query reports programmatically
@@ -16,16 +16,16 @@
 type CrashReport = {
 	processId: string;
 	processType: 'dependency' | 'main' | 'cleanup';
-	type: ReportType;
 	command: string;
 	args: string[];
-	errorMessage: string;
-	errorStack?: string;
-	logs: string;
-	timestamp: string;
-	status: ProcessStatus;
+	exitCode?: number | null;
+	signal?: string | null;
+	errorMessage?: string | null;
+	errorStack?: string | null;
+	lastLogs: string[]; // array of recent log lines
+	timestamp: string; // ISO 8601 timestamp
+	context?: Record<string, unknown>;
 	retryCount?: number;
-	context?: Record<string, any>;
 };
 ```
 
@@ -115,10 +115,10 @@ const reports = reporter.getReports();
 
 for (const report of reports) {
 	console.log(`Process: ${report.processId}`);
-	console.log(`Exit Code: ${report.exitCode}`);
-	console.log(`Signal: ${report.signal}`);
+	console.log(`Error: ${report.errorMessage}`);
+	console.log(`Stack: ${report.errorStack || 'N/A'}`);
 	console.log(`Timestamp: ${report.timestamp}`);
-	console.log(`Last Logs:`, report.lastLogs.slice(-5));
+	console.log(`Recent Logs:`, report.lastLogs.slice(-5).join('\n'));
 }
 ```
 
@@ -130,7 +130,7 @@ Get the most recent crash report.
 const lastCrash = reporter.getLastReport();
 if (lastCrash) {
 	console.error('Last crash:', lastCrash.processId);
-	console.error('Exit code:', lastCrash.exitCode);
+	console.error('Error:', lastCrash.errorMessage);
 }
 ```
 
@@ -192,9 +192,9 @@ const pm = new Ovrseer({
 	crashReporter: new CrashReporter('./crash-reports'),
 });
 
-pm.on('process:crash', ({name, exitCode, signal, report}) => {
+pm.on('process:crash', ({name, report}) => {
 	console.error(`Process ${name} crashed`);
-	console.error(`Exit code: ${exitCode}, Signal: ${signal}`);
+	console.error(`Error: ${report.errorMessage}`);
 	console.error(`Report saved to: ${pm.crashReporter?.getReportsDir()}`);
 });
 ```
@@ -213,23 +213,25 @@ class SentryCrashReporter extends CrashReporter {
 	async saveReport(report: CrashReport): Promise<void> {
 		await super.saveReport(report);
 
-		Sentry.captureException(new Error(`Process ${report.processId} crashed`), {
-			level: 'error',
-			extra: {
-				processId: report.processId,
-				processType: report.processType,
-				command: report.command,
-				args: report.args,
-				exitCode: report.exitCode,
-				signal: report.signal,
-				lastLogs: report.lastLogs,
-				context: report.context,
+		Sentry.captureException(
+			new Error(`Process ${report.processId} crashed: ${report.errorMessage}`),
+			{
+				level: 'error',
+				extra: {
+					processId: report.processId,
+					processType: report.processType,
+					command: report.command,
+					args: report.args,
+					errorMessage: report.errorMessage,
+					errorStack: report.errorStack,
+					lastLogs: report.lastLogs,
+					context: report.context,
+				},
+				tags: {
+					process_type: report.processType,
+				},
 			},
-			tags: {
-				process_type: report.processType,
-				exit_code: report.exitCode?.toString(),
-			},
-		});
+		);
 	}
 }
 
@@ -287,8 +289,8 @@ class SlackCrashReporter extends CrashReporter {
 	async saveReport(report: CrashReport): Promise<void> {
 		await super.saveReport(report);
 
-		const emoji = report.exitCode === 137 ? '💀' : '🚨';
-		const color = report.signal ? 'danger' : 'warning';
+		const emoji = report.errorMessage.includes('OOM') ? '💀' : '🚨';
+		const color = report.errorStack ? 'danger' : 'warning';
 
 		await fetch(this.webhookUrl, {
 			method: 'POST',
@@ -300,15 +302,15 @@ class SlackCrashReporter extends CrashReporter {
 						color,
 						fields: [
 							{title: 'Process Type', value: report.processType, short: true},
-							{
-								title: 'Exit Code',
-								value: report.exitCode?.toString() || 'N/A',
-								short: true,
-							},
-							{title: 'Signal', value: report.signal || 'N/A', short: true},
+{
+						{title: 'Exit Code',
+							value: (report.context && report.context.exitCode) ? String(report.context.exitCode) : 'N/A',
+							short: true,
+						},
+						{title: 'Signal', value: (report.context && report.context.signal) ? String(report.context.signal) : 'N/A', short: true},
 							{
 								title: 'Time',
-								value: report.timestamp.toISOString(),
+								value: report.timestamp,
 								short: true,
 							},
 							{
@@ -317,8 +319,11 @@ class SlackCrashReporter extends CrashReporter {
 								short: false,
 							},
 							{
-								title: 'Last Logs',
-								value: `\`\`\`${report.lastLogs.slice(-10).join('\n')}\`\`\``,
+								title: 'Recent Logs',
+								value: `\`\`\`${report.logs
+									.split('\n')
+									.slice(-10)
+									.join('\n')}\`\`\``,
 								short: false,
 							},
 						],
@@ -349,16 +354,16 @@ class DatabaseCrashReporter extends CrashReporter {
 
 		await this.db.query(
 			`INSERT INTO crash_reports (
-				process_id, process_type, command, args,
-				exit_code, signal, timestamp, last_logs, context
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+						process_id, process_type, command, args,
+						message, stack, timestamp, logs, context
+					) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			[
 				report.processId,
 				report.processType,
 				report.command,
 				JSON.stringify(report.args),
-				report.exitCode,
-				report.signal,
+				report.errorMessage,
+				report.errorStack,
 				report.timestamp,
 				JSON.stringify(report.lastLogs),
 				JSON.stringify(report.context),
@@ -379,10 +384,10 @@ class DatabaseCrashReporter extends CrashReporter {
 			processType: row.process_type,
 			command: row.command,
 			args: JSON.parse(row.args),
-			exitCode: row.exit_code,
-			signal: row.signal,
+			errorMessage: row.message,
+			errorStack: row.stack,
 			timestamp: row.timestamp,
-			lastLogs: JSON.parse(row.last_logs),
+			logs: JSON.parse(row.logs),
 			context: JSON.parse(row.context || '{}'),
 		}));
 	}
@@ -405,7 +410,7 @@ const pm = new Ovrseer({crashReporter: reporter});
 pm.on('process:crash', () => {
 	const reports = reporter.getReports();
 	const recentCrashes = reports.filter(
-		r => Date.now() - r.timestamp.getTime() < 5 * 60 * 1000,
+		r => Date.now() - new Date(r.timestamp).getTime() < 5 * 60 * 1000,
 	);
 
 	if (recentCrashes.length > 5) {
@@ -423,12 +428,15 @@ pm.on('process:crash', () => {
 
 ```ts
 pm.on('process:crash', ({report}) => {
-	if (report.exitCode === 137 || report.signal === 'SIGKILL') {
+	if (
+		report.errorMessage.includes('OOM') ||
+		/SIGKILL/.test(report.errorMessage)
+	) {
 		console.error('Likely out-of-memory crash');
 
-		const memoryLogs = report.lastLogs.filter(line =>
-			/memory|heap|oom/i.test(line),
-		);
+		const memoryLogs = report.lastLogs
+			.split('\n')
+			.filter(line => /memory|heap|oom/i.test(line));
 
 		if (memoryLogs.length > 0) {
 			console.error('Memory-related logs:', memoryLogs);
@@ -444,7 +452,9 @@ function groupCrashes(reports: CrashReport[]): Map<string, CrashReport[]> {
 	const groups = new Map<string, CrashReport[]>();
 
 	for (const report of reports) {
-		const key = `${report.processId}-${report.exitCode}-${report.signal}`;
+		const key = `${report.processId}-${report.errorMessage}-${
+			(report.errorStack || '').split('\n')[0]
+		}`;
 		const group = groups.get(key) || [];
 		group.push(report);
 		groups.set(key, group);
@@ -513,12 +523,15 @@ class RedactingCrashReporter extends CrashReporter {
 	async saveReport(report: CrashReport): Promise<void> {
 		const redacted = {
 			...report,
-			lastLogs: report.lastLogs.map(line =>
-				line
-					.replace(/password[=:]\S+/gi, 'password=***')
-					.replace(/api[_-]?key[=:]\S+/gi, 'api_key=***')
-					.replace(/token[=:]\S+/gi, 'token=***'),
-			),
+			lastLogs: report.lastLogs
+				.split('\n')
+				.map(line =>
+					line
+						.replace(/password[=:]\S+/gi, 'password=***')
+						.replace(/api[_-]?key[=:]\S+/gi, 'api_key=***')
+						.replace(/token[=:]\S+/gi, 'token=***'),
+				)
+				.join('\n'),
 		};
 
 		await super.saveReport(redacted);
@@ -534,8 +547,8 @@ Distinguish between expected and critical failures:
 pm.on('process:crash', ({report}) => {
 	const isCritical =
 		report.processType === 'dependency' ||
-		report.exitCode === 1 ||
-		report.signal === 'SIGSEGV';
+		report.errorMessage.includes('fatal') ||
+		/report\w*segv/i.test(report.errorMessage || '');
 
 	if (isCritical) {
 		sendCriticalAlert(report);
@@ -556,12 +569,15 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 function analyzeCrashPatterns(reports: CrashReport[]) {
-	const exitCodes = new Map<number, number>();
+	const exitCodes = new Map<string, number>();
 	const processes = new Map<string, number>();
 
 	for (const report of reports) {
-		if (report.exitCode !== null) {
-			exitCodes.set(report.exitCode, (exitCodes.get(report.exitCode) || 0) + 1);
+		if (report.errorMessage) {
+			exitCodes.set(
+				report.errorMessage,
+				(exitCodes.get(report.errorMessage) || 0) + 1,
+			);
 		}
 		processes.set(report.processId, (processes.get(report.processId) || 0) + 1);
 	}

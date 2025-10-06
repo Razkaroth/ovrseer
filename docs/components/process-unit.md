@@ -298,14 +298,16 @@ process.onExit((exitCode, signal) => {
 });
 ```
 
-### `onCrash(callback: (error: {exitCode: number | null, signal: string | null}) => void): void`
+### `onCrash(callback: (report: CrashReport) => void): void`
 
-Called when the process crashes (non-zero exit or signal).
+Called when the process crashes (non-zero exit or signal). The handler receives a full `CrashReport` describing the failure.
 
 ```ts
-process.onCrash(({exitCode, signal}) => {
-	console.error(`Process crashed: code=${exitCode}, signal=${signal}`);
-	sendAlert(`Process crashed: ${exitCode || signal}`);
+process.onCrash(report => {
+	console.error(`Process crashed: ${report.errorMessage || report.errorStack}`);
+	sendAlert(
+		`Process crashed: ${report.errorMessage ?? report.errorStack ?? 'unknown'}`,
+	);
 });
 ```
 
@@ -416,7 +418,10 @@ process.onCrash(({exitCode, signal}) => {
 
 	const report = process.crashReporter.getLastReport();
 	if (report) {
-		console.error('Last logs:', report.lastLogs);
+		console.error(
+			'Recent logs:',
+			report.logs.split('\n').slice(-20).join('\n'),
+		);
 	}
 });
 ```
@@ -433,8 +438,8 @@ pm.on('process:ready', ({name}) => {
 	console.log(`${name} is ready`);
 });
 
-pm.on('process:crash', ({name, exitCode}) => {
-	console.error(`${name} crashed with code ${exitCode}`);
+pm.on('process:crash', ({name, report}) => {
+	console.error(`${name} crashed: ${report.errorMessage}`);
 });
 
 await pm.start();

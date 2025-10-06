@@ -202,16 +202,20 @@ pm.on('process:ready', ({name, duration}) => {
 	console.log(`✓ ${name} ready after ${duration}ms`);
 });
 
-pm.on('process:crash', ({name, exitCode, signal}) => {
-	console.error(`✗ ${name} crashed: exitCode=${exitCode}, signal=${signal}`);
+pm.on('process:crash', ({name, report}) => {
+	console.error(
+		`✗ ${name} crashed: ${
+			report.errorMessage ?? report.errorStack ?? 'unknown'
+		}`,
+	);
 });
 
 pm.on(
 	'flag:matched',
-	({processName, flagName, line, matchCount, targetCount}) => {
+	({processId, processType, flagName, line, matchCount, targetCount}) => {
 		if (targetCount !== undefined && matchCount > targetCount) {
 			console.warn(
-				`⚠ Flag "${flagName}" in ${processName} exceeded target: ${matchCount}/${targetCount}`,
+				`⚠ Flag "${flagName}" in ${processId} (${processType}) exceeded target: ${matchCount}/${targetCount}`,
 			);
 		}
 	},
@@ -272,7 +276,7 @@ While processes run, flags track important events:
 
 If any process crashes, Ovrseer:
 
-1. Generates a crash report with exit code, signal, and last 100 log lines
+1. Generates a crash report with optional `errorMessage`/`errorStack`, a newline-separated `logs` string (recent lines), and `timestamp` (ISO 8601)
 2. Emits a `process:crash` event
 3. Attempts restart (up to 3 times with 2s delay)
 4. Marks process as permanently failed if retries exhausted
@@ -370,14 +374,19 @@ pm.on('flag:matched', ({processName, flagName, line}) => {
 Integrate with error tracking:
 
 ```ts
-pm.on('process:crash', async ({name, exitCode, signal}) => {
+pm.on('process:crash', async ({name, report}) => {
 	await fetch('https://sentry.io/api/events', {
 		method: 'POST',
 		headers: {Authorization: `Bearer ${process.env.SENTRY_TOKEN}`},
 		body: JSON.stringify({
 			message: `Process ${name} crashed`,
 			level: 'error',
-			extra: {exitCode, signal},
+			extra: {
+				message: report.errorMessage ?? undefined,
+				stack: report.errorStack ?? undefined,
+				lastLogs: report.lastLogs,
+				timestamp: report.timestamp,
+			},
 		}),
 	});
 });
@@ -493,6 +502,6 @@ Inspect crash reports:
 ```ts
 pm.on('process:crash', ({name, report}) => {
 	console.log('Crash report:', report);
-	console.log('Last logs:', report.lastLogs);
+	console.log('Recent logs:\n', report.lastLogs.slice(-20).join('\n'));
 });
 ```

@@ -89,17 +89,22 @@ Flags can have **target counts**—if a flag matches more times than its target,
 
 ```ts
 type CrashReport = {
-	processName: string;
+	processId: string;
+	processType: 'dependency' | 'main' | 'cleanup';
 	command: string;
 	args: string[];
-	exitCode: number | null;
-	signal: string | null;
-	timestamp: Date;
-	lastLogs: string[];
+	exitCode?: number | null;
+	signal?: string | null;
+	errorMessage?: string | null;
+	errorStack?: string | null;
+	lastLogs: string[]; // array of recent log lines
+	timestamp: string; // ISO 8601 timestamp
+	context?: Record<string, unknown>;
+	retryCount?: number;
 };
 ```
 
-By default, reports are written to `./crash-reports/{processName}-{timestamp}.json`. You can extend CrashReporter to send reports to Sentry, Datadog, or custom backends.
+By default, reports are written to `./crash-reports/{processId}-{timestamp}.json`. You can extend CrashReporter to send reports to Sentry, Datadog, or custom backends.
 
 #### Ovrseer
 

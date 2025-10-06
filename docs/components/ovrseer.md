@@ -64,13 +64,13 @@ Exit
 ## Constructor
 
 ```ts
-new Ovrseer(options?: ProcessManagerOptions)
+new Ovrseer(options?: OvrseerOptions)
 ```
 
 ### Options
 
 ```ts
-type ProcessManagerOptions = {
+type OvrseerOptions = {
 	retries?: number;
 	retryDelay?: number;
 	cleanupTimeout?: number;
@@ -263,13 +263,7 @@ Emitted when a process exits (clean or crash).
 ```ts
 pm.on(
 	'process:crash',
-	(data: {
-		name: string;
-		exitCode: number | null;
-		signal: string | null;
-		report: CrashReport;
-		timestamp: number;
-	}) => {},
+	(data: {name: string; report: CrashReport; timestamp: number}) => {},
 );
 ```
 
@@ -437,8 +431,8 @@ pm.on('process:restart', ({name, retryCount, maxRetries}) => {
 	console.log(`${name} restarting: attempt ${retryCount}/${maxRetries}`);
 });
 
-pm.on('process:crash', ({name, exitCode}) => {
-	console.error(`${name} crashed with code ${exitCode}`);
+pm.on('process:crash', ({name, errorMessage, errorStack}) => {
+	console.error(`${name} crashed: ${errorMessage ?? errorStack ?? 'unknown'}`);
 });
 ```
 
@@ -449,7 +443,7 @@ If a process crashes 4 times, it's permanently stopped (3 retries = 4 total atte
 Integrate with error tracking services:
 
 ```ts
-pm.on('process:crash', async ({name, exitCode, signal, report}) => {
+pm.on('process:crash', async ({name, errorMessage, errorStack, report}) => {
 	await fetch('https://sentry.io/api/events', {
 		method: 'POST',
 		headers: {
@@ -460,9 +454,9 @@ pm.on('process:crash', async ({name, exitCode, signal, report}) => {
 			message: `Process ${name} crashed`,
 			level: 'error',
 			extra: {
-				exitCode,
-				signal,
-				lastLogs: report.lastLogs,
+				errorMessage,
+				errorStack,
+				logs: report.logs,
 				timestamp: report.timestamp,
 			},
 		}),
@@ -491,9 +485,9 @@ pm.on('process:crash', ({name}) => {
 	statsd.increment('process.crash', {process: name});
 });
 
-pm.on('flag:matched', ({processName, flagName}) => {
+pm.on('flag:matched', ({processId, processType, flagName}) => {
 	if (flagName === 'errors') {
-		statsd.increment('app.errors', {process: processName});
+		statsd.increment('app.errors', {process: processId, type: processType});
 	}
 });
 ```
@@ -501,7 +495,7 @@ pm.on('flag:matched', ({processName, flagName}) => {
 ### Slack Alerts
 
 ```ts
-pm.on('process:crash', async ({name, exitCode, report}) => {
+pm.on('process:crash', async ({name, report}) => {
 	await fetch(process.env.SLACK_WEBHOOK_URL, {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json'},
@@ -511,15 +505,15 @@ pm.on('process:crash', async ({name, exitCode, report}) => {
 				{
 					color: 'danger',
 					fields: [
-						{title: 'Exit Code', value: exitCode, short: true},
+						{title: 'Error', value: report.errorMessage ?? report.errorStack ?? 'N/A', short: true},
 						{
 							title: 'Time',
-							value: new Date(report.timestamp).toISOString(),
+							value: report.timestamp,
 							short: true,
 						},
 						{
-							title: 'Last Logs',
-							value: `\`\`\`${report.lastLogs.slice(-5).join('\n')}\`\`\``,
+							title: 'Recent Logs',
+							value: `\`\`\`${report.logs.split('\n').slice(-5).join('\n')}\`\`\``,
 							short: false,
 						},
 					],
@@ -527,6 +521,7 @@ pm.on('process:crash', async ({name, exitCode, report}) => {
 			],
 		}),
 	});
+});
 });
 ```
 
