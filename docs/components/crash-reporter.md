@@ -16,27 +16,33 @@
 type CrashReport = {
 	processId: string;
 	processType: 'dependency' | 'main' | 'cleanup';
+	type: ReportType;
 	command: string;
 	args: string[];
-	exitCode: number | null;
-	signal: string | null;
-	timestamp: Date;
-	lastLogs: string[];
+	errorMessage: string;
+	errorStack?: string;
+	logs: string;
+	timestamp: string;
+	status: ProcessStatus;
+	retryCount?: number;
 	context?: Record<string, any>;
 };
 ```
 
-| Field         | Type             | Description                                    |
-| ------------- | ---------------- | ---------------------------------------------- |
-| `processId`   | `string`         | Unique process identifier                      |
-| `processType` | `string`         | Process group: dependency, main, or cleanup    |
-| `command`     | `string`         | Executable command                             |
-| `args`        | `string[]`       | Command arguments                              |
-| `exitCode`    | `number \| null` | Exit code (null if killed by signal)           |
-| `signal`      | `string \| null` | Signal that terminated process (e.g., SIGKILL) |
-| `timestamp`   | `Date`           | When crash occurred                            |
-| `lastLogs`    | `string[]`       | Recent log lines (default: last 100)           |
-| `context`     | `object`         | Optional custom metadata                       |
+| Field          | Type                                  | Description                                           |
+| -------------- | ------------------------------------- | ----------------------------------------------------- |
+| `processId`    | `string`                              | Unique process identifier                             |
+| `processType`  | `"dependency" \| "main" \| "cleanup"` | Process group the process belonged to                 |
+| `type`         | `ReportType`                          | Report classification (e.g., `crash`, `oom`, `error`) |
+| `command`      | `string`                              | Executable command                                    |
+| `args`         | `string[]`                            | Command arguments                                     |
+| `errorMessage` | `string`                              | Error message or summary                              |
+| `errorStack`   | `string?`                             | Optional stack trace string                           |
+| `logs`         | `string`                              | Concatenated logs (plain text)                        |
+| `timestamp`    | `string`                              | ISO timestamp string when report was generated        |
+| `status`       | `ProcessStatus`                       | Process status at crash (e.g., `running`, `crashed`)  |
+| `retryCount`   | `number?`                             | Optional number of retries attempted                  |
+| `context`      | `object?`                             | Optional custom metadata                              |
 
 ## Constructor
 
