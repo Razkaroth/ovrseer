@@ -41,8 +41,8 @@ export function createProcessUnit(
 	checks: ReadyCheck[],
 	logger?: ProcessLogger,
 ) {
-	const simpleLogger = logger ?? new ProcessLogger(10, 5);
-	return new ProcessUnit(command, args, checks, simpleLogger);
+	const processLogger = logger ?? new ProcessLogger(10, 5);
+	return new ProcessUnit(command, args, checks, processLogger);
 }
 
 /**
