@@ -15,6 +15,8 @@ export class InkTUI extends InkTUIWrapper {
 		cleanup: new Map(),
 	};
 	private managedState: TUIState = {};
+	// Map of event name -> handler function reference registered on the manager
+	private managerHandlers: Map<string, (...args: any[]) => void> | null = null;
 
 	attachToManager(manager: OvrseerI): void {
 		if (this.manager) {
@@ -23,22 +25,30 @@ export class InkTUI extends InkTUIWrapper {
 
 		this.manager = manager;
 
-		manager.on<'status:message'>(
+		// Initialize handler container
+		this.managerHandlers = new Map();
+
+		const addHandler = <K extends keyof ProcessManagerEvents>(
+			event: K,
+			handler: (data: ProcessManagerEvents[K]) => void,
+		) => {
+			this.managerHandlers!.set(String(event), handler as any);
+			manager.on(event as any, handler as any);
+		};
+
+		addHandler(
 			'status:message',
 			(data: ProcessManagerEvents['status:message']) => {
 				this.showStatus(data.message);
 			},
 		);
 
-		manager.on<'state:update'>(
-			'state:update',
-			(data: ProcessManagerEvents['state:update']) => {
-				this.managedProcesses = data.processes;
-				this.render(data.processes, this.managedState);
-			},
-		);
+		addHandler('state:update', (data: ProcessManagerEvents['state:update']) => {
+			this.managedProcesses = data.processes;
+			this.render(data.processes, this.managedState);
+		});
 
-		manager.on<'process:ready'>(
+		addHandler(
 			'process:ready',
 			(data: ProcessManagerEvents['process:ready']) => {
 				this.showStatus(`Process ${data.id} is ready`);
@@ -46,7 +56,7 @@ export class InkTUI extends InkTUIWrapper {
 			},
 		);
 
-		manager.on<'process:crashed'>(
+		addHandler(
 			'process:crashed',
 			(data: ProcessManagerEvents['process:crashed']) => {
 				this.showStatus(`Process ${data.id} crashed: ${data.error.message}`);
@@ -54,107 +64,96 @@ export class InkTUI extends InkTUIWrapper {
 			},
 		);
 
-		manager.on<'manager:started'>('manager:started', () => {
+		addHandler('manager:started', (() => {
 			this.showStatus('Manager started');
-		});
+		}) as any);
 
-		manager.on<'manager:stopping'>('manager:stopping', () => {
+		addHandler('manager:stopping', (() => {
 			this.showStatus('Stopping all processes...');
-		});
+		}) as any);
 
-		manager.on<'manager:stopped'>('manager:stopped', () => {
+		addHandler('manager:stopped', (() => {
 			this.showStatus('All processes stopped');
-		});
+		}) as any);
 
-		manager.on<'manager:restarting'>('manager:restarting', () => {
+		addHandler('manager:restarting', (() => {
 			this.showStatus('Restarting all processes...');
-		});
+		}) as any);
 
-		manager.on<'process:added'>(
-			'process:added',
-			(data: ProcessManagerEvents['process:added']) => {
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:added', ((
+			data: ProcessManagerEvents['process:added'],
+		) => {
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'process:removed'>(
-			'process:removed',
-			(data: ProcessManagerEvents['process:removed']) => {
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:removed', ((
+			data: ProcessManagerEvents['process:removed'],
+		) => {
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'dependency:failed'>(
-			'dependency:failed',
-			(data: ProcessManagerEvents['dependency:failed']) => {
-				this.showStatus(`Dependency ${data.id} failed: ${data.error.message}`);
-			},
-		);
+		addHandler('dependency:failed', ((
+			data: ProcessManagerEvents['dependency:failed'],
+		) => {
+			this.showStatus(`Dependency ${data.id} failed: ${data.error.message}`);
+		}) as any);
 
-		manager.on<'cleanup:timeout'>(
-			'cleanup:timeout',
-			(data: ProcessManagerEvents['cleanup:timeout']) => {
-				this.showStatus(
-					`Cleanup process ${data.id} timeout: ${data.error.message}`,
-				);
-			},
-		);
+		addHandler('cleanup:timeout', ((
+			data: ProcessManagerEvents['cleanup:timeout'],
+		) => {
+			this.showStatus(
+				`Cleanup process ${data.id} timeout: ${data.error.message}`,
+			);
+		}) as any);
 
-		manager.on<'cleanup:started'>('cleanup:started', () => {
+		addHandler('cleanup:started', (() => {
 			this.showStatus('Running cleanup processes...');
-		});
+		}) as any);
 
-		manager.on<'cleanup:finished'>('cleanup:finished', () => {
+		addHandler('cleanup:finished', (() => {
 			this.showStatus('Cleanup finished');
-		});
+		}) as any);
 
-		manager.on<'process:started'>(
-			'process:started',
-			(data: ProcessManagerEvents['process:started']) => {
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:started', ((
+			data: ProcessManagerEvents['process:started'],
+		) => {
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'process:stopping'>(
-			'process:stopping',
-			(data: ProcessManagerEvents['process:stopping']) => {
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:stopping', ((
+			data: ProcessManagerEvents['process:stopping'],
+		) => {
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'process:stopped'>(
-			'process:stopped',
-			(data: ProcessManagerEvents['process:stopped']) => {
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:stopped', ((
+			data: ProcessManagerEvents['process:stopped'],
+		) => {
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'process:restarting'>(
-			'process:restarting',
-			(data: ProcessManagerEvents['process:restarting']) => {
-				this.showStatus(`Restarting process ${data.id}...`);
-				this.render(this.managedProcesses, this.managedState);
-			},
-		);
+		addHandler('process:restarting', ((
+			data: ProcessManagerEvents['process:restarting'],
+		) => {
+			this.showStatus(`Restarting process ${data.id}...`);
+			this.render(this.managedProcesses, this.managedState);
+		}) as any);
 
-		manager.on<'process:log'>(
-			'process:log',
-			(data: ProcessManagerEvents['process:log']) => {
-				if (
-					this.managedState.selectedProcessId === data.id &&
-					this.managedState.selectedProcessType === data.type
-				) {
-					const process = this.getProcessByIdAndType(data.id, data.type);
-					if (process) {
-						let logs = 'No logs available';
-						try {
-							logs = process.logger.getLogs();
-						} catch {}
-						this.showLogs(data.id, data.type, logs);
-					}
+		addHandler('process:log', ((data: ProcessManagerEvents['process:log']) => {
+			if (
+				this.managedState.selectedProcessId === data.id &&
+				this.managedState.selectedProcessType === data.type
+			) {
+				const process = this.getProcessByIdAndType(data.id, data.type);
+				if (process) {
+					let logs = 'No logs available';
+					try {
+						logs = process.logger.getLogs();
+					} catch {}
+					this.showLogs(data.id, data.type, logs);
 				}
-			},
-		);
+			}
+		}) as any);
 
 		this.onKeyPress(async (key: string, meta?: TUIKeyPressMeta) => {
 			if (key === 'q' || key === 'C-c') {
@@ -225,9 +224,36 @@ export class InkTUI extends InkTUIWrapper {
 	}
 
 	detachFromManager(): void {
-		if (this.manager) {
-			this.manager = null;
+		if (!this.manager) return;
+
+		// Unregister all stored handlers on the manager (if any)
+		const handlers = this.managerHandlers;
+		if (handlers) {
+			for (const [event, handler] of handlers.entries()) {
+				try {
+					if (typeof (this.manager as any).off === 'function') {
+						(this.manager as any).off(event, handler as any);
+					}
+				} catch (_e) {
+					// ignore
+				}
+				try {
+					if (typeof (this.manager as any).removeEventListener === 'function') {
+						(this.manager as any).removeEventListener(event, handler as any);
+					}
+				} catch (_e) {
+					// ignore
+				}
+			}
+
+			handlers.clear();
+			this.managerHandlers = null;
 		}
+
+		// Remove keypress callback by setting a no-op (InkTUIWrapper doesn't expose an "off")
+		this.onKeyPress(() => {});
+
+		this.manager = null;
 	}
 
 	private getProcessByIdAndType(id: string, type: string) {
