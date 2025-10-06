@@ -7,6 +7,8 @@ import type {
 	TUIKeyPressMeta,
 	ProcessUnitI,
 	FlagState,
+	LogEntry,
+	LogType,
 } from './types.js';
 
 type ProcessItem = {
@@ -19,7 +21,7 @@ type InkTUIRendererProps = {
 	processes: ProcessMap;
 	state: TUIState;
 	statusMessage?: string;
-	logsData?: {id: string; type: TUIProcessType; content: string} | null;
+	logsData?: {id: string; type: TUIProcessType; logs: LogEntry[]} | null;
 	onKeyPress?: (key: string, meta?: TUIKeyPressMeta) => void;
 };
 
@@ -208,9 +210,9 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		}
 	}, [state.selectedProcessId, state.selectedProcessType, processItems]);
 
-	const logLines = useMemo(() => {
+	const logEntries = useMemo(() => {
 		if (!logsData) return [];
-		return logsData.content.split('\n');
+		return logsData.logs;
 	}, [logsData]);
 
 	const maxLogLines = Math.max(1, terminalHeight - 10);
@@ -221,16 +223,16 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		: false;
 
 	useEffect(() => {
-		if (isTailing && logsData && logLines.length > maxLogLines) {
-			setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+		if (isTailing && logsData && logEntries.length > maxLogLines) {
+			setLogScrollOffset(Math.max(0, logEntries.length - maxLogLines));
 		}
-	}, [logLines, isTailing, logsData, maxLogLines]);
+	}, [logEntries, isTailing, logsData, maxLogLines]);
 
-	const visibleLogLines = useMemo(() => {
+	const visibleLogEntries = useMemo(() => {
 		const start = logScrollOffset;
 		const end = start + maxLogLines;
-		return logLines.slice(start, end);
-	}, [logLines, logScrollOffset, maxLogLines]);
+		return logEntries.slice(start, end);
+	}, [logEntries, logScrollOffset, maxLogLines]);
 
 	useInput(
 		(input, key) => {
@@ -252,8 +254,8 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						newMap.set(currentProcessKey, newTailing);
 						return newMap;
 					});
-					if (newTailing && logLines.length > maxLogLines) {
-						setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+					if (newTailing && logEntries.length > maxLogLines) {
+						setLogScrollOffset(Math.max(0, logEntries.length - maxLogLines));
 					}
 				}
 			} else if (key.return) {
@@ -300,7 +302,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					}
 					setLogScrollOffset(
 						Math.min(
-							Math.max(0, logLines.length - maxLogLines),
+							Math.max(0, logEntries.length - maxLogLines),
 							logScrollOffset + 1,
 						),
 					);
@@ -354,7 +356,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				}
 				setLogScrollOffset(
 					Math.min(
-						Math.max(0, logLines.length - maxLogLines),
+						Math.max(0, logEntries.length - maxLogLines),
 						logScrollOffset + maxLogLines,
 					),
 				);
@@ -430,11 +432,11 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	};
 
 	const scrollInfo =
-		logsData && logLines.length > maxLogLines
+		logsData && logEntries.length > maxLogLines
 			? ` [${logScrollOffset + 1}-${Math.min(
 					logScrollOffset + maxLogLines,
-					logLines.length,
-			  )}/${logLines.length}]`
+					logEntries.length,
+			  )}/${logEntries.length}]`
 			: '';
 
 	return (
@@ -493,19 +495,50 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 										{logsData.type}:{logsData.id}
 									</Text>
 									<Box flexDirection="column" marginTop={1} flexGrow={1}>
-										{visibleLogLines.map((line, idx) => {
+										{visibleLogEntries.map((entry, idx) => {
 											const actualLineNumber = logScrollOffset + idx + 1;
+											const getLogColor = (
+												type: LogType,
+											):
+												| 'red'
+												| 'yellow'
+												| 'blue'
+												| 'cyan'
+												| 'magenta'
+												| undefined => {
+												switch (type) {
+													case 'error':
+														return 'red';
+													case 'warn':
+														return 'yellow';
+													case 'info':
+														return 'blue';
+													case 'UserInput':
+														return 'cyan';
+													case 'UserInputSecret':
+														return 'magenta';
+													case 'debug':
+														return 'magenta';
+													default:
+														return undefined;
+												}
+											};
+											const displayContent =
+												entry.type === 'UserInputSecret'
+													? '***'
+													: entry.content;
+											const color = getLogColor(entry.type);
 											return (
 												<Text key={actualLineNumber}>
 													<Text dimColor>
 														{String(actualLineNumber).padStart(4, ' ')}│
 													</Text>
-													{line}
+													<Text color={color}>{displayContent}</Text>
 												</Text>
 											);
 										})}
 									</Box>
-									{logLines.length > maxLogLines && (
+									{logEntries.length > maxLogLines && (
 										<Box>
 											<Text dimColor>
 												j/k/↑/↓ scroll line | PgUp/PgDn scroll page | t toggle

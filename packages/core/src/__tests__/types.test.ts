@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import {describe, it, expect} from 'vitest';
 import type {
 	ProcessStatus,
 	ProcessUnitI,
@@ -232,7 +232,7 @@ describe('Core Types', () => {
 
 		it('should accept zero count', () => {
 			const state: FlagState = {
-				flag: { pattern: /test/, color: 'green' },
+				flag: {pattern: /test/, color: 'green'},
 				count: 0,
 				matches: [],
 			};
@@ -243,7 +243,7 @@ describe('Core Types', () => {
 
 		it('should accept large count', () => {
 			const state: FlagState = {
-				flag: { pattern: /test/, color: 'green' },
+				flag: {pattern: /test/, color: 'green'},
 				count: 999999,
 				matches: [],
 			};
@@ -390,7 +390,7 @@ describe('Core Types', () => {
 				status: 'crashed',
 				context: {
 					additionalInfo: 'Custom context',
-					metadata: { foo: 'bar' },
+					metadata: {foo: 'bar'},
 				},
 			};
 

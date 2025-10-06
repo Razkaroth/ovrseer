@@ -1,7 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { InkTUI } from '../InkTUI.js';
-import type { OvrseerI, ProcessUnitI, ProcessManagerEvents, TUIProcessType } from '../types.js';
-import { EventEmitter } from 'events';
+import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import {InkTUI} from '../InkTUI.js';
+import type {
+	OvrseerI,
+	ProcessUnitI,
+	ProcessManagerEvents,
+	TUIProcessType,
+	LogEntry,
+	LogType,
+} from '../types.js';
+import {EventEmitter} from 'events';
 
 // Mock Ovrseer implementation
 class MockOvrseer implements OvrseerI {
@@ -49,21 +56,25 @@ class MockOvrseer implements OvrseerI {
 	}
 
 	start(): void {
-		this.eventEmitter.emit('manager:started', { timestamp: Date.now() });
+		this.eventEmitter.emit('manager:started', {timestamp: Date.now()});
 	}
 
 	async stop(): Promise<void> {
-		this.eventEmitter.emit('manager:stopping', { timestamp: Date.now() });
+		this.eventEmitter.emit('manager:stopping', {timestamp: Date.now()});
 		await new Promise(resolve => setTimeout(resolve, 10));
-		this.eventEmitter.emit('manager:stopped', { timestamp: Date.now() });
+		this.eventEmitter.emit('manager:stopped', {timestamp: Date.now()});
 	}
 
 	restartProcess(id: string, processType?: TUIProcessType): void {
-		this.eventEmitter.emit('process:restarting', { id, type: processType || 'main', timestamp: Date.now() });
+		this.eventEmitter.emit('process:restarting', {
+			id,
+			type: processType || 'main',
+			timestamp: Date.now(),
+		});
 	}
 
 	restartAll(): void {
-		this.eventEmitter.emit('manager:restarting', { timestamp: Date.now() });
+		this.eventEmitter.emit('manager:restarting', {timestamp: Date.now()});
 	}
 
 	restartAllMainProcesses(): void {
@@ -99,7 +110,10 @@ class MockOvrseer implements OvrseerI {
 	}
 
 	// Helper for triggering events in tests
-	triggerEvent<K extends keyof ProcessManagerEvents>(event: K, data: ProcessManagerEvents[K]): void {
+	triggerEvent<K extends keyof ProcessManagerEvents>(
+		event: K,
+		data: ProcessManagerEvents[K],
+	): void {
 		this.eventEmitter.emit(event, data);
 	}
 }
@@ -112,9 +126,10 @@ class MockProcessUnit implements ProcessUnitI {
 
 	constructor() {
 		this.logger = {
-			onLog: vi.fn(() => () => { }),
-			onError: vi.fn(() => () => { }),
+			onLog: vi.fn(() => () => {}),
+			onError: vi.fn(() => () => {}),
 			getLogs: vi.fn(() => 'mock logs'),
+			getTypedLogs: vi.fn(() => []),
 			addChunk: vi.fn(),
 			reset: vi.fn(),
 			addFlag: vi.fn(),
@@ -126,27 +141,27 @@ class MockProcessUnit implements ProcessUnitI {
 		};
 	}
 
-	start(): void { }
-	async stop(): Promise<void> { }
-	kill(): void { }
+	start(): void {}
+	async stop(): Promise<void> {}
+	kill(): void {}
 	isRunning(): boolean {
 		return true;
 	}
 	getStatus() {
 		return 'running' as const;
 	}
-	async runReadyChecks(): Promise<void> { }
-	prepareForRestart(): void { }
-	restart(): void { }
-	cleanup(): void { }
+	async runReadyChecks(): Promise<void> {}
+	prepareForRestart(): void {}
+	restart(): void {}
+	cleanup(): void {}
 	onExit(): () => void {
-		return () => { };
+		return () => {};
 	}
 	onCrash(): () => void {
-		return () => { };
+		return () => {};
 	}
 	onReady(): () => void {
-		return () => { };
+		return () => {};
 	}
 }
 
@@ -174,7 +189,9 @@ describe('InkTUI', () => {
 
 		it('should throw when attaching to manager twice', () => {
 			tui.attachToManager(mockManager);
-			expect(() => tui.attachToManager(mockManager)).toThrow('Already attached to a manager');
+			expect(() => tui.attachToManager(mockManager)).toThrow(
+				'Already attached to a manager',
+			);
 		});
 
 		it('should allow detaching from manager', () => {
@@ -234,24 +251,26 @@ describe('InkTUI', () => {
 				error: new Error('Test crash'),
 				timestamp: Date.now(),
 			});
-			expect(showStatusSpy).toHaveBeenCalledWith('Process test-proc crashed: Test crash');
+			expect(showStatusSpy).toHaveBeenCalledWith(
+				'Process test-proc crashed: Test crash',
+			);
 		});
 
 		it('should handle manager:started events', () => {
 			const showStatusSpy = vi.spyOn(tui, 'showStatus');
-			mockManager.triggerEvent('manager:started', { timestamp: Date.now() });
+			mockManager.triggerEvent('manager:started', {timestamp: Date.now()});
 			expect(showStatusSpy).toHaveBeenCalledWith('Manager started');
 		});
 
 		it('should handle manager:stopping events', () => {
 			const showStatusSpy = vi.spyOn(tui, 'showStatus');
-			mockManager.triggerEvent('manager:stopping', { timestamp: Date.now() });
+			mockManager.triggerEvent('manager:stopping', {timestamp: Date.now()});
 			expect(showStatusSpy).toHaveBeenCalledWith('Stopping all processes...');
 		});
 
 		it('should handle manager:stopped events', () => {
 			const showStatusSpy = vi.spyOn(tui, 'showStatus');
-			mockManager.triggerEvent('manager:stopped', { timestamp: Date.now() });
+			mockManager.triggerEvent('manager:stopped', {timestamp: Date.now()});
 			expect(showStatusSpy).toHaveBeenCalledWith('All processes stopped');
 		});
 	});
@@ -335,7 +354,9 @@ describe('InkTUI', () => {
 		it('should handle quit keys', async () => {
 			const stopSpy = vi.spyOn(mockManager, 'stop');
 			const destroySpy = vi.spyOn(tui, 'destroy');
-			const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+			const exitSpy = vi
+				.spyOn(process, 'exit')
+				.mockImplementation(() => undefined as never);
 
 			// Simulate keypress
 			const handler = vi.fn();
@@ -375,7 +396,7 @@ describe('InkTUI', () => {
 			const callback = handler.mock.calls[0]?.[0];
 			if (typeof callback === 'function') {
 				// First select a process, then restart
-				callback('select', { processInfo: { id: 'main1', type: 'main' } });
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
 				callback('r', undefined);
 			}
 
@@ -413,11 +434,11 @@ describe('InkTUI', () => {
 
 			const callback = handler.mock.calls[0]?.[0];
 			if (typeof callback === 'function') {
-				callback('select', { processInfo: { id: 'main1', type: 'main' } });
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
 				callback('enter', undefined);
 			}
 
-			expect(showLogsSpy).toHaveBeenCalledWith('main1', 'main', 'mock logs');
+			expect(showLogsSpy).toHaveBeenCalledWith('main1', 'main', []);
 		});
 
 		it('should update logs on process:log event', () => {
@@ -426,12 +447,11 @@ describe('InkTUI', () => {
 
 			const showLogsSpy = vi.spyOn(tui, 'showLogs');
 
-			// Select process first
 			const handler = vi.fn();
 			tui.onKeyPress(handler);
 			const callback = handler.mock.calls[0]?.[0];
 			if (typeof callback === 'function') {
-				callback('select', { processInfo: { id: 'main1', type: 'main' } });
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
 			}
 
 			mockManager.triggerEvent('process:log', {
@@ -442,7 +462,99 @@ describe('InkTUI', () => {
 				timestamp: Date.now(),
 			});
 
-			expect(proc.logger.getLogs).toHaveBeenCalled();
+			expect(proc.logger.getTypedLogs).toHaveBeenCalled();
+		});
+
+		it('should render typed logs with correct types', () => {
+			const proc = new MockProcessUnit();
+			const mockTypedLogs: LogEntry[] = [
+				{
+					type: 'info' as LogType,
+					content: 'Info message',
+					timestamp: Date.now(),
+				},
+				{
+					type: 'error' as LogType,
+					content: 'Error message',
+					timestamp: Date.now(),
+				},
+				{
+					type: 'warn' as LogType,
+					content: 'Warning message',
+					timestamp: Date.now(),
+				},
+			];
+			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
+			mockManager.addMainProcess('main1', proc);
+
+			const showLogsSpy = vi.spyOn(tui, 'showLogs');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+			if (typeof callback === 'function') {
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
+				callback('enter', undefined);
+			}
+
+			expect(proc.logger.getTypedLogs).toHaveBeenCalled();
+			expect(showLogsSpy).toHaveBeenCalledWith('main1', 'main', mockTypedLogs);
+		});
+
+		it('should mask UserInputSecret logs', () => {
+			const proc = new MockProcessUnit();
+			const mockTypedLogs: LogEntry[] = [
+				{
+					type: 'UserInput' as LogType,
+					content: 'normal input',
+					timestamp: Date.now(),
+				},
+				{
+					type: 'UserInputSecret' as LogType,
+					content: 'secret password',
+					timestamp: Date.now(),
+				},
+			];
+			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
+			mockManager.addMainProcess('main1', proc);
+
+			const showLogsSpy = vi.spyOn(tui, 'showLogs');
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+			if (typeof callback === 'function') {
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
+				callback('enter', undefined);
+			}
+
+			expect(showLogsSpy).toHaveBeenCalledWith('main1', 'main', mockTypedLogs);
+		});
+
+		it('should call getTypedLogs on process:log event', () => {
+			const proc = new MockProcessUnit();
+			const mockTypedLogs: LogEntry[] = [
+				{type: 'info' as LogType, content: 'New log', timestamp: Date.now()},
+			];
+			proc.logger.getTypedLogs = vi.fn(() => mockTypedLogs);
+			mockManager.addMainProcess('main1', proc);
+
+			const handler = vi.fn();
+			tui.onKeyPress(handler);
+			const callback = handler.mock.calls[0]?.[0];
+			if (typeof callback === 'function') {
+				callback('select', {processInfo: {id: 'main1', type: 'main'}});
+			}
+
+			mockManager.triggerEvent('process:log', {
+				id: 'main1',
+				type: 'main',
+				message: 'New log message',
+				isError: false,
+				timestamp: Date.now(),
+			});
+
+			expect(proc.logger.getTypedLogs).toHaveBeenCalled();
 		});
 	});
 
@@ -464,11 +576,16 @@ describe('InkTUI', () => {
 		});
 
 		it('should handle operations before attachment', () => {
-			expect(() => tui.render({
-				dependencies: new Map(),
-				main: new Map(),
-				cleanup: new Map(),
-			}, {})).not.toThrow();
+			expect(() =>
+				tui.render(
+					{
+						dependencies: new Map(),
+						main: new Map(),
+						cleanup: new Map(),
+					},
+					{},
+				),
+			).not.toThrow();
 		});
 
 		it('should handle detachment cleanup', () => {
@@ -513,7 +630,9 @@ describe('InkTUI', () => {
 				timestamp: Date.now(),
 			});
 
-			expect(showStatusSpy).toHaveBeenCalledWith('Dependency dep1 failed: Dependency failed');
+			expect(showStatusSpy).toHaveBeenCalledWith(
+				'Dependency dep1 failed: Dependency failed',
+			);
 		});
 
 		it('should handle cleanup timeout', () => {
@@ -526,7 +645,9 @@ describe('InkTUI', () => {
 				timestamp: Date.now(),
 			});
 
-			expect(showStatusSpy).toHaveBeenCalledWith('Cleanup process cleanup1 timeout: Timeout');
+			expect(showStatusSpy).toHaveBeenCalledWith(
+				'Cleanup process cleanup1 timeout: Timeout',
+			);
 		});
 	});
 });

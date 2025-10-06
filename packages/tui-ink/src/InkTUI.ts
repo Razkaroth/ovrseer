@@ -168,9 +168,9 @@ export class InkTUI extends InkTUIWrapper {
 			) {
 				const process = this.getProcessByIdAndType(data.id, data.type);
 				if (process) {
-					let logs = 'No logs available';
+					let logs = [];
 					try {
-						logs = process.logger.getLogs();
+						logs = process.logger.getTypedLogs();
 					} catch {}
 					this.showLogs(data.id, data.type, logs);
 				}
@@ -215,9 +215,9 @@ export class InkTUI extends InkTUIWrapper {
 						this.managedState.selectedProcessType,
 					);
 					if (process) {
-						let logs = 'No logs available';
+						let logs = [];
 						try {
-							logs = process.logger.getLogs();
+							logs = process.logger.getTypedLogs();
 						} catch {}
 						this.showLogs(
 							this.managedState.selectedProcessId,
@@ -282,7 +282,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'dependency') {
 			const existing = this.managedProcesses.dependencies.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getDependency === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getDependency === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getDependency(id);
 					if (p) {
@@ -296,7 +299,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'main') {
 			const existing = this.managedProcesses.main.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getMainProcess === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getMainProcess === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getMainProcess(id);
 					if (p) {
@@ -310,7 +316,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'cleanup') {
 			const existing = this.managedProcesses.cleanup.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getCleanupProcess === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getCleanupProcess === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getCleanupProcess(id);
 					if (p) {
