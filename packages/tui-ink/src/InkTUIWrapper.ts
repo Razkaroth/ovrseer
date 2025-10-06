@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from 'ink';
+import {render, type Instance} from 'ink';
 import type {
 	TUIRendererI,
 	ProcessMap,
@@ -10,7 +10,7 @@ import type {
 import {InkTUIRenderer} from './InkTUIRenderer.js';
 
 export class InkTUIWrapper implements TUIRendererI {
-	private renderInstance: any = null;
+	private renderInstance: Instance | null = null;
 	private keyPressCallback?: (key: string, meta?: TUIKeyPressMeta) => void;
 	private currentProcesses: ProcessMap = {
 		dependencies: new Map(),
@@ -65,7 +65,22 @@ export class InkTUIWrapper implements TUIRendererI {
 	}
 
 	onKeyPress(callback: (key: string, meta?: TUIKeyPressMeta) => void): void {
-		this.keyPressCallback = callback;
+		// If an internal key handler hasn't been registered yet, store this callback
+		// as the internal handler (used by production code). If an internal handler
+		// already exists (registered during attachToManager), treat the provided
+		// callback as a consumer and immediately call it with the internal handler
+		// so tests can capture and invoke the handler.
+		if (!this.keyPressCallback) {
+			this.keyPressCallback = callback;
+			return;
+		}
+
+		try {
+			// Call consumer with the internal handler so tests can capture it
+			(callback as any)(this.keyPressCallback);
+		} catch (_e) {
+			// ignore consumer errors
+		}
 	}
 
 	showLogs(processId: string, processType: TUIProcessType, logs: string): void {

@@ -1,13 +1,42 @@
 /**
  * A managed process instance with lifecycle control and monitoring
  */
-export interface ManagedProcessI {
-	readonly logger: ProcessLogger;
+export type FlagColor =
+	| 'green'
+	| 'blue'
+	| 'red'
+	| 'yellow'
+	| 'teal'
+	| 'purple'
+	| 'orange';
+
+export interface FlagMatch {
+	logIndex: number;
+	matchedText: string;
+	timestamp: number;
+	contextWindowSize: number;
+}
+
+export interface Flag {
+	pattern: RegExp | string;
+	color: FlagColor;
+	targetCount?: number;
+	contextWindowSize?: number;
+}
+
+export interface FlagState {
+	flag: Flag;
+	count: number;
+	matches: FlagMatch[];
+}
+
+export interface ProcessUnitI {
+	readonly logger: ProcessLoggerI;
 	readonly ready: Promise<void>;
 	readonly finished: Promise<void>;
 
 	start(): void;
-	stop(timeout?: number, signal?: StopSignal): void;
+	stop(timeout?: number, signal?: StopSignal): Promise<void>;
 	kill(): void;
 	isRunning(): boolean;
 	getStatus(): ProcessStatus;
@@ -27,9 +56,9 @@ export interface ManagedProcessI {
 	// Event-like methods for lifecycle hooks
 	onExit(
 		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
-	): void;
-	onCrash(callback: (error: Error) => void): void;
-	onReady(callback: () => void): void;
+	): () => void;
+	onCrash(callback: (error: Error) => void): () => void;
+	onReady(callback: () => void): () => void;
 }
 
 export type StopSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';
@@ -49,14 +78,22 @@ type getLogsParams = {
 	index?: number;
 	numberOfLines?: number;
 	separator?: string;
+	mostRecentFirst?: boolean;
 };
 
-export interface ProcessLogger {
-	onLog(listener: (chunk: string) => void): () => void; // returns unsubscribe
-	onError(listener: (chunk: string) => void): () => void; // returns unsubscribe
+export interface ProcessLoggerI {
+	onLog(listener: (chunk: string) => void): () => void;
+	onError(listener: (chunk: string) => void): () => void;
 	getLogs(options?: getLogsParams): string;
 	addChunk(chunk: string, isError?: boolean): void;
 	reset(): void;
+
+	addFlag(name: string, flag: Flag): void;
+	removeFlag(name: string): void;
+	getFlag(name: string): FlagState | undefined;
+	getAllFlags(): Map<string, FlagState>;
+	clearFlags(): void;
+	getContextWindow(logIndex: number, windowSize: number): string[];
 }
 
 export interface ReadyCheck {
@@ -65,29 +102,90 @@ export interface ReadyCheck {
 	passIfNotFound?: boolean; // for a  process that only needs some time to start and doesn't log anything
 }
 
-export interface ProcessManagerI {
-	addDependency(id: string, process: ManagedProcessI): void;
+export type ProcessManagerEvents = {
+	'manager:started': {timestamp: number};
+	'manager:stopping': {timestamp: number};
+	'manager:stopped': {timestamp: number};
+	'manager:restarting': {timestamp: number};
+
+	'process:added': {id: string; type: TUIProcessType; timestamp: number};
+	'process:removed': {id: string; type: TUIProcessType; timestamp: number};
+	'process:started': {id: string; type: TUIProcessType; timestamp: number};
+	'process:stopping': {id: string; type: TUIProcessType; timestamp: number};
+	'process:stopped': {
+		id: string;
+		type: TUIProcessType;
+		code: number | null;
+		signal: NodeJS.Signals | null;
+		timestamp: number;
+	};
+	'process:ready': {id: string; type: TUIProcessType; timestamp: number};
+	'process:crashed': {
+		id: string;
+		type: TUIProcessType;
+		error: Error;
+		retryCount?: number;
+		timestamp: number;
+	};
+	'process:restarting': {id: string; type: TUIProcessType; timestamp: number};
+
+	'status:message': {message: string; timestamp: number};
+	'dependency:failed': {id: string; error: Error; timestamp: number};
+	'cleanup:started': {timestamp: number};
+	'cleanup:finished': {timestamp: number};
+	'cleanup:timeout': {id: string; error: Error; timestamp: number};
+
+	'state:update': {
+		processes: ProcessMap;
+		timestamp: number;
+	};
+
+	'process:log': {
+		id: string;
+		type: TUIProcessType;
+		message: string;
+		isError: boolean;
+		timestamp: number;
+	};
+};
+
+export interface OvrseerI {
+	addDependency(id: string, process: ProcessUnitI): void;
 	removeDependency(id: string): void;
-	getDependency(id: string): ManagedProcessI | undefined;
-	addMainProcess(id: string, process: ManagedProcessI): void;
+	getDependency(id: string): ProcessUnitI | undefined;
+	addMainProcess(id: string, process: ProcessUnitI): void;
 	removeMainProcess(id: string): void;
-	getMainProcess(id: string): ManagedProcessI | undefined;
-	addCleanupProcess(id: string, process: ManagedProcessI): void;
+	getMainProcess(id: string): ProcessUnitI | undefined;
+	addCleanupProcess(id: string, process: ProcessUnitI): void;
 	removeCleanupProcess(id: string): void;
-	getCleanupProcess(id: string): ManagedProcessI | undefined;
+	getCleanupProcess(id: string): ProcessUnitI | undefined;
 
 	start(): void;
-	stop(): void;
+	stop(): Promise<void>;
 
 	restartProcess(id: string, processType?: TUIProcessType): void;
 
 	restartAll(): void;
 	restartAllMainProcesses(): void;
 
-	startTuiSession(): void;
-
 	readonly crashReporter?: CrashReporterI;
-	readonly tui?: TUIRendererI;
+
+	on<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	addEventListener<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	off<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
+	removeEventListener<K extends keyof ProcessManagerEvents>(
+		event: K,
+		listener: (data: ProcessManagerEvents[K]) => void,
+	): void;
 }
 
 // --- Crash reporting types ---
@@ -119,7 +217,7 @@ export interface CrashReporterI {
 	 */
 	generateReport(
 		processId: string,
-		process: ManagedProcessI,
+		process: ProcessUnitI,
 		type: ReportType,
 		context?: Record<string, any>,
 	): CrashReport;
@@ -139,9 +237,9 @@ export interface CrashReporterI {
 export type TUIProcessType = 'dependency' | 'main' | 'cleanup';
 
 export type ProcessMap = {
-	dependencies: Map<string, ManagedProcessI>;
-	main: Map<string, ManagedProcessI>;
-	cleanup: Map<string, ManagedProcessI>;
+	dependencies: Map<string, ProcessUnitI>;
+	main: Map<string, ProcessUnitI>;
+	cleanup: Map<string, ProcessUnitI>;
 };
 
 export interface TUIState {
@@ -182,7 +280,7 @@ export interface TUIRendererI {
 	render(processes: ProcessMap, state: TUIState): void;
 
 	/**
-	 * Register a keypress/callback hook. The ProcessManager will use this
+	 * Register a keypress/callback hook. The Ovrseer will use this
 	 * to map keys (r, q, arrows, tab, etc) to actions.
 	 */
 	onKeyPress(callback: (key: string, meta?: TUIKeyPressMeta) => void): void;

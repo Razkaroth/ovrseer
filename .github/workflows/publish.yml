@@ -1,0 +1,72 @@
+name: Publish packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Configure npm auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm -w run build
+
+      - name: Publish packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              private=$(jq -r '.private // false' "$pkg/package.json")
+              name=$(jq -r '.name' "$pkg/package.json")
+              version=$(jq -r '.version' "$pkg/package.json")
+              if [ "$private" != "true" ]; then
+                # Skip if this exact version is already on the registry
+                if npm view "$name@$version" version >/dev/null 2>&1; then
+                  echo "Skipping already-published $name@$version"
+                  continue
+                fi
+                echo "Publishing $name@$version from $pkg"
+                (cd "$pkg" && npm publish --access public --provenance)
+              else
+                echo "Skipping private package $name"
+              fi
+            fi
+          done

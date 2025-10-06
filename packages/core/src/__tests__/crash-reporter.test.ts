@@ -1,32 +1,37 @@
+import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {CrashReporter} from '../crash-reporter';
-import {SimpleLogger} from '../logger';
-import {fakeManagedProcess} from './mocks';
+import {ProcessLogger} from '../logger';
+import {fakeProcessUnit} from './mocks';
 import type {CrashReport} from '../types';
 import {join} from 'path';
 import {tmpdir} from 'os';
 
-// Mock fs/promises used by CrashReporter implementation (if any)
-vi.mock('fs/promises', () => {
-	const mockWriteFile = vi.fn();
-	const mockMkdir = vi.fn();
+const {mockWriteFile, mockMkdir} = vi.hoisted(() => {
 	return {
-		default: {
-			writeFile: mockWriteFile,
-			mkdir: mockMkdir,
-		},
-		writeFile: mockWriteFile,
-		mkdir: mockMkdir,
+		mockWriteFile: vi.fn(),
+		mockMkdir: vi.fn(),
 	};
 });
 
+vi.mock('fs/promises', () => ({
+	default: {
+		writeFile: mockWriteFile,
+		mkdir: mockMkdir,
+	},
+	writeFile: mockWriteFile,
+	mkdir: mockMkdir,
+}));
+
 describe('CrashReporter', () => {
 	let crashReporter: CrashReporter;
-	let mockLogger: SimpleLogger;
+	let mockLogger: ProcessLogger;
 
 	beforeEach(() => {
 		crashReporter = new CrashReporter();
-		mockLogger = new SimpleLogger(10, 5);
+		mockLogger = new ProcessLogger(10, 5);
 		vi.clearAllMocks();
+		mockWriteFile.mockResolvedValue(undefined);
+		mockMkdir.mockResolvedValue(undefined);
 	});
 
 	it('initially has no reports', () => {
@@ -49,7 +54,7 @@ describe('CrashReporter', () => {
 			mockLogger.onError(() => {}); // Add error listener to prevent unhandled error
 			mockLogger.addChunk('log1');
 			mockLogger.addChunk('error1', true);
-			const process = fakeManagedProcess({
+			const process = fakeProcessUnit({
 				logger: mockLogger,
 				getStatus: vi.fn(() => 'crashed' as any),
 			});
@@ -64,7 +69,7 @@ describe('CrashReporter', () => {
 		});
 
 		it('includes context and retryCount when provided', () => {
-			const process = fakeManagedProcess({logger: mockLogger});
+			const process = fakeProcessUnit({logger: mockLogger});
 			const report = crashReporter.generateReport(
 				'pid',
 				process,
@@ -93,18 +98,12 @@ describe('CrashReporter', () => {
 			await crashReporter.saveReport(report);
 			const reports = crashReporter.getReports();
 			expect(reports).toContain(report);
-			const {mkdir, writeFile} = await vi.importMock<
-				typeof import('fs/promises')
-			>('fs/promises');
-			expect(mkdir).toHaveBeenCalled();
-			expect(writeFile).toHaveBeenCalled();
+			expect(mockMkdir).toHaveBeenCalled();
+			expect(mockWriteFile).toHaveBeenCalled();
 		});
 
 		it('handles write failures gracefully', async () => {
-			const {writeFile} = await vi.importMock<typeof import('fs/promises')>(
-				'fs/promises',
-			);
-			vi.mocked(writeFile).mockRejectedValueOnce(new Error('disk full'));
+			mockWriteFile.mockRejectedValueOnce(new Error('disk full'));
 
 			const report: CrashReport = {
 				timestamp: new Date().toISOString(),
