@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Setup pnpm
@@ -64,7 +64,7 @@ jobs:
                   continue
                 fi
                 echo "Publishing $name@$version from $pkg"
-                (cd "$pkg" && npm publish --access public)
+                (cd "$pkg" && npm publish --access public --provenance)
               else
                 echo "Skipping private package $name"
               fi
