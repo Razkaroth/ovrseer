@@ -51,13 +51,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          set -e
+          set -euo pipefail
           for pkg in packages/*; do
             if [ -f "$pkg/package.json" ]; then
               private=$(jq -r '.private // false' "$pkg/package.json")
               name=$(jq -r '.name' "$pkg/package.json")
               version=$(jq -r '.version' "$pkg/package.json")
               if [ "$private" != "true" ]; then
+                # Skip if this exact version is already on the registry
+                if npm view "$name@$version" version >/dev/null 2>&1; then
+                  echo "Skipping already-published $name@$version"
+                  continue
+                fi
                 echo "Publishing $name@$version from $pkg"
                 (cd "$pkg" && npm publish --access public)
               else
