@@ -298,7 +298,10 @@ export class ProcessUnit {
 		this._onCrashCallbacks.push(callback);
 	}
 
-	stop(timeout: number = 1000, signal: StopSignal = 'SIGINT'): void {
+	async stop(
+		timeout: number = 1000,
+		signal: StopSignal = 'SIGINT',
+	): Promise<void> {
 		if (!this.isRunning()) {
 			console.warn('Tried to stop a process that is not running.');
 			console.warn(
@@ -325,6 +328,8 @@ export class ProcessUnit {
 
 		// Add escalation timer to timers array for cleanup
 		this._timers.push(this._escalationTimer);
+
+		return this.finished;
 	}
 
 	kill(): void {

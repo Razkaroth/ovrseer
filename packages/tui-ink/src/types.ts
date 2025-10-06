@@ -7,7 +7,7 @@ export interface ProcessUnitI {
 	readonly finished: Promise<void>;
 
 	start(): void;
-	stop(timeout?: number, signal?: StopSignal): void;
+	stop(timeout?: number, signal?: StopSignal): Promise<void>;
 	kill(): void;
 	isRunning(): boolean;
 	getStatus(): ProcessStatus;
@@ -160,7 +160,7 @@ export interface OvrseerI {
 	getCleanupProcess(id: string): ProcessUnitI | undefined;
 
 	start(): void;
-	stop(): void;
+	stop(): Promise<void>;
 
 	restartProcess(id: string, processType?: TUIProcessType): void;
 
