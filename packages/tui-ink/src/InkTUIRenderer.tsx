@@ -380,6 +380,26 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						logScrollOffset + maxLogLines,
 					),
 				);
+			} else if (key.ctrl && input === 'n') {
+				const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
+			} else if (key.ctrl && input === 'p') {
+				const newIndex = Math.max(0, selectedIndex - 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
 			} else if (input === 'f') {
 				onKeyPress('f');
 			} else if (input === 'm') {

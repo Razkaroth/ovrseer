@@ -539,6 +539,31 @@ describe('ProcessUnit', () => {
 			expect(process.getStatus()).toEqual('running');
 			expect(process.process).not.toBeNull();
 		});
+
+		it('should restart after normal completion (completed -> running)', async () => {
+			const process = createProcessUnit(
+				'echo',
+				['hello'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
+
+			process.start();
+
+			// Simulate normal exit
+			stubProc.emit('exit', 0);
+
+			await expect(process.finished).resolves.toBeUndefined();
+
+			// Now call restart() which should prepare and start again
+			process.restart();
+
+			// Allow the restart flow to run (promises/microtasks)
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(process.getStatus()).toEqual('running');
+			expect(process.process).not.toBeNull();
+		});
 	});
 
 	describe('sendStdin()', () => {

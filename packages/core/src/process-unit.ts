@@ -414,22 +414,28 @@ export class ProcessUnit {
 	}
 
 	restart(): void {
-		if (!this.isRunning() && this._status !== 'stopping') {
-			throw new Error('Cannot restart: process is not running');
+		// If the process is running (or stopping), stop it first then restart when finished
+		if (this.isRunning() || this._status === 'stopping') {
+			// Stop the process and wait for it to exit, then restart
+			this.stop();
+
+			// Wait for the process to finish, then prepare and restart
+			this.finished
+				.catch(() => {
+					// Ignore errors during stop
+				})
+				.finally(() => {
+					this.prepareForRestart();
+					this.start();
+				});
+
+			return;
 		}
 
-		// Stop the process and wait for it to exit, then restart
-		this.stop();
-
-		// Wait for the process to finish, then prepare and restart
-		this.finished
-			.catch(() => {
-				// Ignore errors during stop
-			})
-			.finally(() => {
-				this.prepareForRestart();
-				this.start();
-			});
+		// If the process is not running (completed, stopped, crashed, etc.),
+		// simply prepare and start immediately
+		this.prepareForRestart();
+		this.start();
 	}
 
 	isRunning(): boolean {
