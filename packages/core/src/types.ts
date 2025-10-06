@@ -78,6 +78,7 @@ type getLogsParams = {
 	index?: number;
 	numberOfLines?: number;
 	separator?: string;
+	mostRecentFirst?: boolean;
 };
 
 export interface ProcessLoggerI {
