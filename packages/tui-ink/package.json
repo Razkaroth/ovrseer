@@ -18,7 +18,7 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"lint": "prettier --check .",
-		"test": "vitest"
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@ovrseer/core": "workspace:*",
