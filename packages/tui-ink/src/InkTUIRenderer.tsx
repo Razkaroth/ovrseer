@@ -213,7 +213,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		return logsData.content.split('\n');
 	}, [logsData]);
 
-	const maxLogLines = terminalHeight - 10;
+	const maxLogLines = Math.max(1, terminalHeight - 10);
 
 	const currentProcessKey = logsData ? `${logsData.type}:${logsData.id}` : null;
 	const isTailing = currentProcessKey
