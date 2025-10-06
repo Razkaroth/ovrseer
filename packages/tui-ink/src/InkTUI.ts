@@ -235,7 +235,16 @@ export class InkTUI extends InkTUIWrapper {
 				process.exit(0);
 			} else if (key === 's') {
 				if (this.manager) {
-					this.manager.start();
+					try {
+						const res: any = this.manager.start();
+						if (res && typeof res.then === 'function') {
+							res.catch((e: any) => {
+								this.showStatus(e?.message ?? String(e));
+							});
+						}
+					} catch (e: any) {
+						this.showStatus(e?.message ?? String(e));
+					}
 				}
 			} else if (key === 'r') {
 				if (
