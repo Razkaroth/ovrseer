@@ -276,6 +276,16 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						});
 					}
 					setLogScrollOffset(Math.max(0, logScrollOffset - 1));
+				} else {
+					const newIndex = Math.max(0, selectedIndex - 1);
+					setSelectedIndex(newIndex);
+					if (processItems[newIndex]) {
+						const item = processItems[newIndex];
+						onKeyPress('select', {
+							index: newIndex,
+							processInfo: {id: item.id, type: item.type},
+						});
+					}
 				}
 			} else if (key.downArrow || input === 'j') {
 				if (state.flagPanelFocused) {
@@ -294,6 +304,16 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 							logScrollOffset + 1,
 						),
 					);
+				} else {
+					const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
+					setSelectedIndex(newIndex);
+					if (processItems[newIndex]) {
+						const item = processItems[newIndex];
+						onKeyPress('select', {
+							index: newIndex,
+							processInfo: {id: item.id, type: item.type},
+						});
+					}
 				}
 			} else if ((key.ctrl && key.upArrow) || input === 'K') {
 				const newIndex = Math.max(0, selectedIndex - 1);
