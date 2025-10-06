@@ -150,7 +150,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		return items;
 	}, [processes]);
 
-	const statusCounts = useMemo(() => {
+	const statusCounts = (() => {
 		const counts = {
 			ready: 0,
 			running: 0,
@@ -179,7 +179,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		});
 
 		return counts;
-	}, [processItems]);
+	})();
 
 	useEffect(() => {
 		if (!hasAutoSelected && processItems.length > 0 && onKeyPress) {
