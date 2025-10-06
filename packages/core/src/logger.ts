@@ -160,7 +160,10 @@ export class ProcessLogger implements ProcessLoggerI {
 			const pattern =
 				typeof flagState.flag.pattern === 'string'
 					? new RegExp(flagState.flag.pattern)
-					: flagState.flag.pattern;
+					: new RegExp(
+							(flagState.flag.pattern as RegExp).source,
+							(flagState.flag.pattern as RegExp).flags,
+					  );
 
 			if (pattern.test(chunk)) {
 				const match: FlagMatch = {
