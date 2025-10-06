@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Ovrseer } from '../ovrseer.js';
-import type { ProcessUnitI, ProcessStatus, TUIProcessType } from '../types.js';
-import { EventEmitter } from 'events';
+import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import {Ovrseer} from '../ovrseer.js';
+import type {ProcessUnitI, ProcessStatus, TUIProcessType} from '../types.js';
+import {EventEmitter} from 'events';
 
 // Mock ProcessUnit implementation for testing
 class MockProcessUnit implements ProcessUnitI {
@@ -11,7 +11,9 @@ class MockProcessUnit implements ProcessUnitI {
 	private readyReject?: (err: Error) => void;
 	private finishedResolve?: () => void;
 	private finishedReject?: (err: Error) => void;
-	private exitCallbacks: Array<(code: number | null, signal: NodeJS.Signals | null) => void> = [];
+	private exitCallbacks: Array<
+		(code: number | null, signal: NodeJS.Signals | null) => void
+	> = [];
 	private crashCallbacks: Array<(error: Error) => void> = [];
 	private readyCallbacks: Array<() => void> = [];
 	public logger: any;
@@ -28,8 +30,8 @@ class MockProcessUnit implements ProcessUnitI {
 			this.finishedReject = reject;
 		});
 		this.logger = {
-			onLog: vi.fn(() => () => { }),
-			onError: vi.fn(() => () => { }),
+			onLog: vi.fn(() => () => {}),
+			onError: vi.fn(() => () => {}),
 			getLogs: vi.fn(() => ''),
 			addChunk: vi.fn(),
 			reset: vi.fn(),
@@ -70,7 +72,7 @@ class MockProcessUnit implements ProcessUnitI {
 		return this._status;
 	}
 
-	async runReadyChecks(): Promise<void> { }
+	async runReadyChecks(): Promise<void> {}
 
 	prepareForRestart(): void {
 		this._status = 'created';
@@ -83,9 +85,11 @@ class MockProcessUnit implements ProcessUnitI {
 		});
 	}
 
-	cleanup(): void { }
+	cleanup(): void {}
 
-	onExit(callback: (code: number | null, signal: NodeJS.Signals | null) => void): () => void {
+	onExit(
+		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
+	): () => void {
 		this.exitCallbacks.push(callback);
 		return () => {
 			const index = this.exitCallbacks.indexOf(callback);
@@ -129,6 +133,12 @@ class MockProcessUnit implements ProcessUnitI {
 		this._running = false;
 		this.finishedResolve?.();
 		this.exitCallbacks.forEach(cb => cb(code, signal));
+	}
+
+	sendStdin(input: string, secret: boolean = false): void {
+		if (!this._running) {
+			throw new Error('Cannot send stdin to a process that is not running');
+		}
 	}
 }
 
@@ -667,7 +677,7 @@ describe('Ovrseer', () => {
 		});
 
 		it('should stop after max retries', async () => {
-			const customOvrseer = new Ovrseer({ retries: 2 });
+			const customOvrseer = new Ovrseer({retries: 2});
 			const main1 = new MockProcessUnit();
 
 			customOvrseer.addMainProcess('main1', main1);
@@ -707,12 +717,18 @@ describe('Ovrseer', () => {
 
 		it('should handle complex multi-process scenario', async () => {
 			const deps = [new MockProcessUnit(), new MockProcessUnit()];
-			const mains = [new MockProcessUnit(), new MockProcessUnit(), new MockProcessUnit()];
+			const mains = [
+				new MockProcessUnit(),
+				new MockProcessUnit(),
+				new MockProcessUnit(),
+			];
 			const cleanups = [new MockProcessUnit()];
 
 			deps.forEach((dep, i) => ovrseer.addDependency(`dep${i}`, dep));
 			mains.forEach((main, i) => ovrseer.addMainProcess(`main${i}`, main));
-			cleanups.forEach((cleanup, i) => ovrseer.addCleanupProcess(`cleanup${i}`, cleanup));
+			cleanups.forEach((cleanup, i) =>
+				ovrseer.addCleanupProcess(`cleanup${i}`, cleanup),
+			);
 
 			ovrseer.start();
 
@@ -725,6 +741,77 @@ describe('Ovrseer', () => {
 
 			expect(deps.every(d => !d.isRunning())).toBe(true);
 			expect(mains.every(m => !m.isRunning())).toBe(true);
+		});
+	});
+
+	describe('sendStdin', () => {
+		it('should throw error if process not found', () => {
+			expect(() => ovrseer.sendStdin('nonexistent', 'test')).toThrow(
+				'Process with id "nonexistent" not found',
+			);
+		});
+
+		it('should send stdin to main process', () => {
+			const proc = new MockProcessUnit();
+			const sendStdinSpy = vi.spyOn(proc, 'sendStdin');
+			ovrseer.addMainProcess('test', proc);
+			ovrseer.start();
+
+			ovrseer.sendStdin('test', 'hello');
+
+			expect(sendStdinSpy).toHaveBeenCalledWith('hello', false);
+		});
+
+		it('should send stdin to dependency process', () => {
+			const dep = new MockProcessUnit();
+			const sendStdinSpy = vi.spyOn(dep, 'sendStdin');
+			ovrseer.addDependency('dep1', dep);
+			dep.start();
+
+			ovrseer.sendStdin('dep1', 'world');
+
+			expect(sendStdinSpy).toHaveBeenCalledWith('world', false);
+		});
+
+		it('should send stdin to cleanup process', () => {
+			const cleanup = new MockProcessUnit();
+			const sendStdinSpy = vi.spyOn(cleanup, 'sendStdin');
+			ovrseer.addCleanupProcess('cleanup1', cleanup);
+			cleanup.start();
+
+			ovrseer.sendStdin('cleanup1', 'bye');
+
+			expect(sendStdinSpy).toHaveBeenCalledWith('bye', false);
+		});
+
+		it('should pass secret flag to process sendStdin', () => {
+			const proc = new MockProcessUnit();
+			const sendStdinSpy = vi.spyOn(proc, 'sendStdin');
+			ovrseer.addMainProcess('test', proc);
+			ovrseer.start();
+
+			ovrseer.sendStdin('test', 'password', true);
+
+			expect(sendStdinSpy).toHaveBeenCalledWith('password', true);
+		});
+
+		it('should search all process types when finding process', async () => {
+			const dep = new MockProcessUnit();
+			const main = new MockProcessUnit();
+			const cleanup = new MockProcessUnit();
+
+			ovrseer.addDependency('dep1', dep);
+			ovrseer.addMainProcess('main1', main);
+			ovrseer.addCleanupProcess('cleanup1', cleanup);
+
+			ovrseer.start();
+			dep.simulateReady();
+			await new Promise(resolve => setTimeout(resolve, 50));
+			cleanup.start();
+
+			expect(() => ovrseer.sendStdin('dep1', 'test')).not.toThrow();
+			expect(() => ovrseer.sendStdin('main1', 'test')).not.toThrow();
+			expect(() => ovrseer.sendStdin('cleanup1', 'test')).not.toThrow();
 		});
 	});
 });
