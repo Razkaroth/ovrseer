@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Ovrseer } from '../ovrseer.js';
 import type { ProcessUnitI, ProcessStatus, TUIProcessType } from '../types.js';
 import { EventEmitter } from 'events';
-import { NoopCrashReporter } from '../crash-reporter';
+import { NoopCrashReporter } from '../crash-reporter.js';
 
 // Mock ProcessUnit implementation for testing
 class MockProcessUnit implements ProcessUnitI {
