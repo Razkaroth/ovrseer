@@ -812,7 +812,12 @@ describe('ProcessUnit', () => {
 
 			expect(mockStdin.write).toHaveBeenCalledTimes(100);
 			const typedLogs = mockLogger.getTypedLogs();
-			expect(typedLogs).toHaveLength(100);
+			// Logger has a buffer cap of 10, so only the last 10 entries are retained
+			expect(typedLogs).toHaveLength(10);
+			const contents = typedLogs.map(l => l.content);
+			expect(contents).toEqual(
+				Array.from({length: 10}, (_v, idx) => `input${90 + idx}`),
+			);
 		});
 
 		it('should throw if stdin is undefined', () => {
