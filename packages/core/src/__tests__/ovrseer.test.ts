@@ -1,7 +1,8 @@
-import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
-import {Ovrseer} from '../ovrseer.js';
-import type {ProcessUnitI, ProcessStatus, TUIProcessType} from '../types.js';
-import {EventEmitter} from 'events';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Ovrseer } from '../ovrseer.js';
+import type { ProcessUnitI, ProcessStatus, TUIProcessType } from '../types.js';
+import { EventEmitter } from 'events';
+import { NoopCrashReporter } from '../crash-reporter.js';
 
 // Mock ProcessUnit implementation for testing
 class MockProcessUnit implements ProcessUnitI {
@@ -30,8 +31,8 @@ class MockProcessUnit implements ProcessUnitI {
 			this.finishedReject = reject;
 		});
 		this.logger = {
-			onLog: vi.fn(() => () => {}),
-			onError: vi.fn(() => () => {}),
+			onLog: vi.fn(() => () => { }),
+			onError: vi.fn(() => () => { }),
 			getLogs: vi.fn(() => ''),
 			addChunk: vi.fn(),
 			reset: vi.fn(),
@@ -72,7 +73,7 @@ class MockProcessUnit implements ProcessUnitI {
 		return this._status;
 	}
 
-	async runReadyChecks(): Promise<void> {}
+	async runReadyChecks(): Promise<void> { }
 
 	prepareForRestart(): void {
 		this._status = 'created';
@@ -85,7 +86,7 @@ class MockProcessUnit implements ProcessUnitI {
 		});
 	}
 
-	cleanup(): void {}
+	cleanup(): void { }
 
 	onExit(
 		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
@@ -158,6 +159,12 @@ describe('Ovrseer', () => {
 			expect(ovrseer).toBeDefined();
 			expect(ovrseer.crashReporter).toBeDefined();
 			expect(ovrseer.events).toBeInstanceOf(EventEmitter);
+		});
+
+		it('should initialize using a NoopCrashReporter', () => {
+			const customOvrseer = new Ovrseer({ crashReporter: new NoopCrashReporter() });
+			expect(customOvrseer).toBeDefined();
+			expect(customOvrseer.crashReporter).toBeInstanceOf(NoopCrashReporter);
 		});
 
 		it('should accept custom configuration', () => {
@@ -677,7 +684,7 @@ describe('Ovrseer', () => {
 		});
 
 		it('should stop after max retries', async () => {
-			const customOvrseer = new Ovrseer({retries: 2});
+			const customOvrseer = new Ovrseer({ retries: 2 });
 			const main1 = new MockProcessUnit();
 
 			customOvrseer.addMainProcess('main1', main1);
