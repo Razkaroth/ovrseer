@@ -1,4 +1,5 @@
-import {ProcessLogger} from '../logger';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { ProcessLogger } from '../logger';
 
 describe.each([['ProcessLogger', ProcessLogger]])(
 	'%s Process logger',
@@ -66,13 +67,13 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				max3.addChunk('2');
 				max3.addChunk('3');
 				max3.addChunk('4');
-				expect(max3.getLogs({mostRecentFirst: true})).toBe('432');
+				expect(max3.getLogs({ mostRecentFirst: true })).toBe('432');
 
 				const logger2 = new logger(10, 5, '');
 				for (let i = 0; i < 10; i++) {
 					logger2.addChunk(`${i}`);
 				}
-				expect(logger2.getLogs({mostRecentFirst: true})).toBe('98765');
+				expect(logger2.getLogs({ mostRecentFirst: true })).toBe('98765');
 			});
 
 			it('Should get logs with mostRecentFirst=false (default)', () => {
@@ -81,13 +82,13 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				max3.addChunk('2');
 				max3.addChunk('3');
 				max3.addChunk('4');
-				expect(max3.getLogs({mostRecentFirst: false})).toBe('123');
+				expect(max3.getLogs({ mostRecentFirst: false })).toBe('123');
 
 				const logger2 = new logger(10, 5, '');
 				for (let i = 0; i < 10; i++) {
 					logger2.addChunk(`${i}`);
 				}
-				expect(logger2.getLogs({mostRecentFirst: false})).toBe('01234');
+				expect(logger2.getLogs({ mostRecentFirst: false })).toBe('01234');
 			});
 
 			it('Should return a log segment', () => {
@@ -96,8 +97,8 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				max3.addChunk('2');
 				max3.addChunk('3');
 				max3.addChunk('4');
-				expect(max3.getLogs({index: 0, numberOfLines: 2})).toBe('23');
-				expect(max3.getLogs({index: 1, numberOfLines: 2})).toBe('34');
+				expect(max3.getLogs({ index: 0, numberOfLines: 2 })).toBe('23');
+				expect(max3.getLogs({ index: 1, numberOfLines: 2 })).toBe('34');
 			});
 
 			it('Should return a log segment with mostRecentFirst=true', () => {
@@ -107,10 +108,10 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				max3.addChunk('3');
 				max3.addChunk('4');
 				expect(
-					max3.getLogs({index: 0, numberOfLines: 2, mostRecentFirst: true}),
+					max3.getLogs({ index: 0, numberOfLines: 2, mostRecentFirst: true }),
 				).toBe('43');
 				expect(
-					max3.getLogs({index: 1, numberOfLines: 2, mostRecentFirst: true}),
+					max3.getLogs({ index: 1, numberOfLines: 2, mostRecentFirst: true }),
 				).toBe('32');
 			});
 
@@ -297,8 +298,8 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 			});
 
 			it('Should clear all flags', () => {
-				loggerInstance.addFlag('flag1', {pattern: 'test', color: 'red'});
-				loggerInstance.addFlag('flag2', {pattern: 'test', color: 'blue'});
+				loggerInstance.addFlag('flag1', { pattern: 'test', color: 'red' });
+				loggerInstance.addFlag('flag2', { pattern: 'test', color: 'blue' });
 
 				expect(loggerInstance.getAllFlags().size).toBe(2);
 

@@ -1,12 +1,12 @@
-import {describe, it, expect, vi, beforeEach} from 'vitest';
-import {CrashReporter} from '../crash-reporter';
-import {ProcessLogger} from '../logger';
-import {fakeProcessUnit} from './mocks';
-import type {CrashReport} from '../types';
-import {join} from 'path';
-import {tmpdir} from 'os';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CrashReporter, NoopCrashReporter } from '../crash-reporter';
+import { ProcessLogger } from '../logger';
+import { fakeProcessUnit } from './mocks';
+import type { CrashReport } from '../types';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
-const {mockWriteFile, mockMkdir} = vi.hoisted(() => {
+const { mockWriteFile, mockMkdir } = vi.hoisted(() => {
 	return {
 		mockWriteFile: vi.fn(),
 		mockMkdir: vi.fn(),
@@ -39,7 +39,7 @@ describe('CrashReporter', () => {
 	});
 
 	it('uses default tmp directory when no reportsDir provided', () => {
-		const defaultDir = join(tmpdir(), 'process-manager', 'crash-reports');
+		const defaultDir = join(tmpdir(), 'ovrseer', 'crash-reports');
 		expect(crashReporter.getReportsDir()).toBe(defaultDir);
 	});
 
@@ -51,7 +51,7 @@ describe('CrashReporter', () => {
 
 	describe('generateReport()', () => {
 		it('generates a report with required fields', () => {
-			mockLogger.onError(() => {}); // Add error listener to prevent unhandled error
+			mockLogger.onError(() => { }); // Add error listener to prevent unhandled error
 			mockLogger.addChunk('log1');
 			mockLogger.addChunk('error1', true);
 			const process = fakeProcessUnit({
@@ -69,7 +69,7 @@ describe('CrashReporter', () => {
 		});
 
 		it('includes context and retryCount when provided', () => {
-			const process = fakeProcessUnit({logger: mockLogger});
+			const process = fakeProcessUnit({ logger: mockLogger });
 			const report = crashReporter.generateReport(
 				'pid',
 				process,
@@ -141,4 +141,42 @@ describe('CrashReporter', () => {
 			expect(crashReporter.getReports()).toHaveLength(0);
 		});
 	});
+});
+
+describe('NoopCrashReporter', () => {
+	let crashReporter: NoopCrashReporter;
+	let mockLogger: ProcessLogger;
+
+	beforeEach(() => {
+		crashReporter = new NoopCrashReporter();
+		mockLogger = new ProcessLogger(10, 5);
+		vi.clearAllMocks();
+	});
+
+	it('Can be instantiated', () => {
+		expect(crashReporter).toBeInstanceOf(NoopCrashReporter);
+	});
+
+	it('generates a Noop report', () => {
+		mockLogger.onError(() => { }); // Add error listener to prevent unhandled error
+		mockLogger.addChunk('log1');
+		mockLogger.addChunk('error1', true);
+		const process = fakeProcessUnit({
+			logger: mockLogger,
+			getStatus: vi.fn(() => 'crashed' as any),
+		});
+
+		const report = crashReporter.generateReport('pid', process, 'crash', {});
+
+		expect(report.processId).toBe('pid');
+		expect(report.processType).toBe('main');
+		expect(report.type).toBe('crash');
+		expect(report.status).toBe('crashed');
+		expect(report.timestamp).toBeDefined();
+		expect(report.context).toEqual({});
+		expect(report.retryCount).toBe(0);
+		expect(report.errorMessage).toBe('No error message available (NoopCrashReporter)');
+		expect(report.errorStack).toBe('No error stack available (NoopCrashReporter)');
+		expect(report.logs).toEqual("No logs available (NoopCrashReporter)");
+	})
 });
