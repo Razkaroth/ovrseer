@@ -296,7 +296,7 @@ describe('InkTUI - Input Mode', () => {
 				callback('input-char', {index: 64}); // '@'
 				callback('input-char', {index: 35}); // '#'
 
-				expect(tui.managedState.inputValue).toBe('\!@#');
+				expect(tui.managedState.inputValue).toBe('!@#');
 			}
 		});
 	});

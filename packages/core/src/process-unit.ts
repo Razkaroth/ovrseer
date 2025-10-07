@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import {spawn, ChildProcess} from 'child_process';
 import {
 	ProcessLoggerI,
 	ProcessStatus,
@@ -42,6 +42,7 @@ export class ProcessUnit {
 		args: string[],
 		readyChecks: ReadyCheck[],
 		logger: ProcessLoggerI,
+		private crashOnStderr: boolean = false,
 	) {
 		this.command = command;
 		this.args = args;
@@ -145,7 +146,8 @@ export class ProcessUnit {
 					// Reject for crashed processes
 					this._finishedReject(
 						new Error(
-							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${signal ? `signal ${signal}` : `code ${code}`
+							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${
+								signal ? `signal ${signal}` : `code ${code}`
 							}`,
 						),
 					);
@@ -201,18 +203,32 @@ export class ProcessUnit {
 			this._process.stderr.on('data', chunk => {
 				this.logger.addChunk(chunk.toString(), true);
 			});
-		}
 
-		this.logger.onError((chunk: string) => {
-			this._cleanupTimersAndSubscriptions();
-			this._status = 'crashed';
-			this._readyReject(new Error(chunk));
+			if (this.crashOnStderr) {
+				const unsubscribeStderr = this.logger.onError(chunk => {
+					this._cleanupTimersAndSubscriptions();
+					const error = new Error(
+						`Process stderr output (crashOnStderr enabled): ${chunk}`,
+					);
+					this._status = 'crashed';
+					this._onCrashCallbacks.forEach(cb => {
+						try {
+							cb(error);
+						} catch (_e) {
+							/* swallow callback errors */
+						}
+					});
 
-			if (!this._finishedSettled) {
-				this._finishedSettled = true;
-				this._finishedReject(new Error(chunk));
+					if (!this._finishedSettled) {
+						this._finishedSettled = true;
+						this._finishedReject(error);
+					}
+
+					this.kill();
+				});
+				this._unsubscribers.push(unsubscribeStderr);
 			}
-		});
+		}
 
 		this.runReadyChecks();
 	}
@@ -328,7 +344,6 @@ export class ProcessUnit {
 
 		this._status = 'stopping';
 
-
 		// Send the signal to the process
 		const success = this.process?.kill(signal);
 
@@ -432,7 +447,7 @@ export class ProcessUnit {
 			return;
 		}
 
-		console.log('not running')
+		console.log('not running');
 
 		// If the process is not running (completed, stopped, crashed, etc.),
 		// simply prepare and start immediately

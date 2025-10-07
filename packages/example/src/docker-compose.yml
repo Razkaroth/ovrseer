@@ -1,0 +1,33 @@
+services:
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    command:
+      - --storageEngine=wiredTiger
+    volumes:
+      - data:/data/db
+    logging:
+      driver: none
+
+  # S3 compatible storage
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      MINIO_DEFAULT_BUCKETS: test
+    volumes:
+      - s3:/data
+    command: server /data --console-address ":9001"
+
+  whoami:
+    image: whoami
+
+volumes:
+  data:
+  node_modules:
+  s3:

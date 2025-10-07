@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CrashReporter, NoopCrashReporter } from '../crash-reporter.js';
-import { ProcessLogger } from '../logger.js';
-import { fakeProcessUnit } from './mocks.js';
-import type { CrashReport } from '../types';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import {describe, it, expect, vi, beforeEach} from 'vitest';
+import {CrashReporter, NoopCrashReporter} from '../crash-reporter.js';
+import {ProcessLogger} from '../logger.js';
+import {fakeProcessUnit} from './mocks.js';
+import type {CrashReport} from '../types';
+import {join} from 'path';
+import {tmpdir} from 'os';
 
-const { mockWriteFile, mockMkdir } = vi.hoisted(() => {
+const {mockWriteFile, mockMkdir} = vi.hoisted(() => {
 	return {
 		mockWriteFile: vi.fn(),
 		mockMkdir: vi.fn(),
@@ -51,7 +51,7 @@ describe('CrashReporter', () => {
 
 	describe('generateReport()', () => {
 		it('generates a report with required fields', () => {
-			mockLogger.onError(() => { }); // Add error listener to prevent unhandled error
+			mockLogger.onError(() => {}); // Add error listener to prevent unhandled error
 			mockLogger.addChunk('log1');
 			mockLogger.addChunk('error1', true);
 			const process = fakeProcessUnit({
@@ -69,7 +69,7 @@ describe('CrashReporter', () => {
 		});
 
 		it('includes context and retryCount when provided', () => {
-			const process = fakeProcessUnit({ logger: mockLogger });
+			const process = fakeProcessUnit({logger: mockLogger});
 			const report = crashReporter.generateReport(
 				'pid',
 				process,
@@ -158,7 +158,7 @@ describe('NoopCrashReporter', () => {
 	});
 
 	it('generates a Noop report', () => {
-		mockLogger.onError(() => { }); // Add error listener to prevent unhandled error
+		mockLogger.onError(() => {}); // Add error listener to prevent unhandled error
 		mockLogger.addChunk('log1');
 		mockLogger.addChunk('error1', true);
 		const process = fakeProcessUnit({
@@ -175,8 +175,12 @@ describe('NoopCrashReporter', () => {
 		expect(report.timestamp).toBeDefined();
 		expect(report.context).toEqual({});
 		expect(report.retryCount).toBe(0);
-		expect(report.errorMessage).toBe('No error message available (NoopCrashReporter)');
-		expect(report.errorStack).toBe('No error stack available (NoopCrashReporter)');
-		expect(report.logs).toEqual("No logs available (NoopCrashReporter)");
-	})
+		expect(report.errorMessage).toBe(
+			'No error message available (NoopCrashReporter)',
+		);
+		expect(report.errorStack).toBe(
+			'No error stack available (NoopCrashReporter)',
+		);
+		expect(report.logs).toEqual('No logs available (NoopCrashReporter)');
+	});
 });

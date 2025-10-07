@@ -154,6 +154,12 @@ If a dependency fails readiness checks, main processes won't start.
 npm install @ovrseer/core @ovrseer/tui-ink
 ```
 
+**Note:** `@ovrseer/tui-ink` requires `react@^19.0.0` as a peer dependency. Install React 19:
+
+```bash
+npm install react@^19.2.0
+```
+
 ## Quick Example: Multi-Process Setup
 
 ```ts

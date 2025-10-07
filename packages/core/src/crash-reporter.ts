@@ -4,17 +4,16 @@ import type {
 	ProcessUnitI,
 	ReportType,
 } from './types.js';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import {writeFile, mkdir} from 'fs/promises';
+import {join} from 'path';
+import {tmpdir} from 'os';
 
 export class CrashReporter implements CrashReporterI {
 	private reports: CrashReport[] = [];
 	private reportsDir: string;
 
 	constructor(reportsDir?: string) {
-		this.reportsDir =
-			reportsDir || join(tmpdir(), 'ovrseer', 'crash-reports');
+		this.reportsDir = reportsDir || join(tmpdir(), 'ovrseer', 'crash-reports');
 	}
 
 	generateReport(
@@ -53,10 +52,11 @@ export class CrashReporter implements CrashReporterI {
 		this.reports.push(report);
 
 		try {
-			await mkdir(this.reportsDir, { recursive: true });
+			await mkdir(this.reportsDir, {recursive: true});
 
-			const filename = `${report.timestamp.replace(/[:.]/g, '-')}_${report.processId
-				}.json`;
+			const filename = `${report.timestamp.replace(/[:.]/g, '-')}_${
+				report.processId
+			}.json`;
 			const filepath = join(this.reportsDir, filename);
 
 			await writeFile(filepath, JSON.stringify(report, null, 2), 'utf-8');
@@ -88,7 +88,6 @@ export class CrashReporter implements CrashReporterI {
 }
 
 export class NoopCrashReporter implements CrashReporterI {
-
 	generateReport(
 		processId: string,
 		process: ProcessUnitI,
@@ -113,8 +112,7 @@ export class NoopCrashReporter implements CrashReporterI {
 		return Promise.resolve();
 	}
 
-	clearReports(): void {
-	}
+	clearReports(): void {}
 
 	getReports(): CrashReport[] {
 		return [];

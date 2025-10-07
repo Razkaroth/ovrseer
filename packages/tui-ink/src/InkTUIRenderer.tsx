@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useInput, useStdout } from 'ink';
+import React, {useState, useEffect, useMemo} from 'react';
+import {Box, Text, useInput, useStdout} from 'ink';
 import type {
 	ProcessMap,
 	TUIState,
@@ -21,7 +21,7 @@ type InkTUIRendererProps = {
 	processes: ProcessMap;
 	state: TUIState;
 	statusMessage?: string;
-	logsData?: { id: string; type: TUIProcessType; logs: LogEntry[] } | null;
+	logsData?: {id: string; type: TUIProcessType; logs: LogEntry[]} | null;
 	onKeyPress?: (key: string, meta?: TUIKeyPressMeta) => void;
 };
 
@@ -129,7 +129,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	const [logScrollOffset, setLogScrollOffset] = useState(0);
 	const [hasAutoSelected, setHasAutoSelected] = useState(false);
 	const [tailingMap, setTailingMap] = useState<Map<string, boolean>>(new Map());
-	const { stdout } = useStdout();
+	const {stdout} = useStdout();
 
 	const terminalHeight = stdout?.rows ?? 24;
 	const terminalWidth = stdout?.columns ?? 80;
@@ -138,15 +138,15 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		const items: ProcessItem[] = [];
 
 		processes.dependencies.forEach((process, id) => {
-			items.push({ id, type: 'dependency', process });
+			items.push({id, type: 'dependency', process});
 		});
 
 		processes.main.forEach((process, id) => {
-			items.push({ id, type: 'main', process });
+			items.push({id, type: 'main', process});
 		});
 
 		processes.cleanup.forEach((process, id) => {
-			items.push({ id, type: 'cleanup', process });
+			items.push({id, type: 'cleanup', process});
 		});
 
 		return items;
@@ -190,7 +190,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				setSelectedIndex(0);
 				onKeyPress('select', {
 					index: 0,
-					processInfo: { id: firstItem.id, type: firstItem.type },
+					processInfo: {id: firstItem.id, type: firstItem.type},
 				});
 				setHasAutoSelected(true);
 			}
@@ -283,7 +283,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					onKeyPress('flag-enter');
 				} else if (processItems[selectedIndex]) {
 					const item = processItems[selectedIndex];
-					onKeyPress('enter', { processInfo: { id: item.id, type: item.type } });
+					onKeyPress('enter', {processInfo: {id: item.id, type: item.type}});
 					setLogScrollOffset(0);
 				}
 			} else if (key.upArrow || input === 'k') {
@@ -305,7 +305,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						const item = processItems[newIndex];
 						onKeyPress('select', {
 							index: newIndex,
-							processInfo: { id: item.id, type: item.type },
+							processInfo: {id: item.id, type: item.type},
 						});
 					}
 				}
@@ -333,7 +333,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						const item = processItems[newIndex];
 						onKeyPress('select', {
 							index: newIndex,
-							processInfo: { id: item.id, type: item.type },
+							processInfo: {id: item.id, type: item.type},
 						});
 					}
 				}
@@ -344,7 +344,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					const item = processItems[newIndex];
 					onKeyPress('select', {
 						index: newIndex,
-						processInfo: { id: item.id, type: item.type },
+						processInfo: {id: item.id, type: item.type},
 					});
 				}
 			} else if ((key.ctrl && key.downArrow) || input === 'J') {
@@ -354,7 +354,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					const item = processItems[newIndex];
 					onKeyPress('select', {
 						index: newIndex,
-						processInfo: { id: item.id, type: item.type },
+						processInfo: {id: item.id, type: item.type},
 					});
 				}
 			} else if (key.pageUp && logsData) {
@@ -387,7 +387,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					const item = processItems[newIndex];
 					onKeyPress('select', {
 						index: newIndex,
-						processInfo: { id: item.id, type: item.type },
+						processInfo: {id: item.id, type: item.type},
 					});
 				}
 			} else if (key.ctrl && input === 'p') {
@@ -397,7 +397,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					const item = processItems[newIndex];
 					onKeyPress('select', {
 						index: newIndex,
-						processInfo: { id: item.id, type: item.type },
+						processInfo: {id: item.id, type: item.type},
 					});
 				}
 			} else if (input === 'f') {
@@ -410,19 +410,19 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				onKeyPress('p');
 			}
 		},
-		{ isActive: true },
+		{isActive: true},
 	);
 
 	const renderProcessList = () => {
-		const groups: { title: string; items: ProcessItem[] }[] = [];
+		const groups: {title: string; items: ProcessItem[]}[] = [];
 
 		const deps = processItems.filter(item => item.type === 'dependency');
 		const mains = processItems.filter(item => item.type === 'main');
 		const cleanups = processItems.filter(item => item.type === 'cleanup');
 
-		if (deps.length > 0) groups.push({ title: 'Dependencies', items: deps });
-		if (mains.length > 0) groups.push({ title: 'Main', items: mains });
-		if (cleanups.length > 0) groups.push({ title: 'Cleanup', items: cleanups });
+		if (deps.length > 0) groups.push({title: 'Dependencies', items: deps});
+		if (mains.length > 0) groups.push({title: 'Main', items: mains});
+		if (cleanups.length > 0) groups.push({title: 'Cleanup', items: cleanups});
 
 		return groups.map((group, groupIdx) => (
 			<Box key={groupIdx} flexDirection="column" marginBottom={1}>
@@ -454,14 +454,17 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 							>
 								<Text color={color}>{`  ${icon}`}</Text>
 								{` ${item.id} `}
-								{flagsWithCounts.map((f, i) =>
-									f.count > 0 ? (
-										<Text key={i} color={getFlagColorCode(f.color)}>
+								{flagsWithCounts
+									.filter(f => f.count > 0)
+									.map((f, i) => (
+										<Text
+											key={`${f.color}-${i}`}
+											color={getFlagColorCode(f.color)}
+										>
 											{getFlagEmoji(f.color)}
 											<Text>{f.count} </Text>
 										</Text>
-									) : null,
-								)}
+									))}
 								<Text dimColor>[{status}]</Text>
 							</Text>
 						</Box>
@@ -474,9 +477,9 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	const scrollInfo =
 		logsData && logEntries.length > maxLogLines
 			? ` [${logScrollOffset + 1}-${Math.min(
-				logScrollOffset + maxLogLines,
-				logEntries.length,
-			)}/${logEntries.length}]`
+					logScrollOffset + maxLogLines,
+					logEntries.length,
+			  )}/${logEntries.length}]`
 			: '';
 
 	const renderInputField = () => {
@@ -679,9 +682,9 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 												state.matchContextVisible?.has(matchNodeId);
 											const contextWindow = showContext
 												? logger.getContextWindow(
-													match.logIndex,
-													match.contextWindowSize,
-												)
+														match.logIndex,
+														match.contextWindowSize,
+												  )
 												: null;
 											items.push(
 												<Box
@@ -709,7 +712,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 																	Math.floor(contextWindow.length / 2);
 																return (
 																	<Text
-																		key={lineIdx}
+																		key={`${matchNodeId}-ctx-${lineIdx}`}
 																		dimColor={!isMatchLine}
 																		color={isMatchLine ? undefined : 'gray'}
 																	>
