@@ -350,5 +350,225 @@ describe.each([['ProcessLogger', ProcessLogger]])(
 				expect(flag?.flag.targetCount).toBe(5);
 			});
 		});
-	},
+
+		describe('Typed Logs with LogType', () => {
+			it('should add logs with explicit type parameter', () => {
+				loggerInstance.addChunk('info message', false, 'info');
+				loggerInstance.addChunk('warning message', false, 'warn');
+				loggerInstance.addChunk('debug message', false, 'debug');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(3);
+				expect(typedLogs[0].type).toBe('info');
+				expect(typedLogs[0].content).toBe('info message');
+				expect(typedLogs[1].type).toBe('warn');
+				expect(typedLogs[1].content).toBe('warning message');
+				expect(typedLogs[2].type).toBe('debug');
+				expect(typedLogs[2].content).toBe('debug message');
+			});
+
+			it('should default to "log" type when type is not provided', () => {
+				loggerInstance.addChunk('default log');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].type).toBe('log');
+				expect(typedLogs[0].content).toBe('default log');
+			});
+
+			it('should use "error" type when isError is true and no type provided', () => {
+				loggerInstance.addChunk('error message', true);
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].type).toBe('error');
+				expect(typedLogs[0].content).toBe('error message');
+			});
+
+			it('should override isError flag when explicit type is provided', () => {
+				loggerInstance.addChunk('info message', true, 'info');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].type).toBe('info');
+				expect(typedLogs[0].content).toBe('info message');
+			});
+
+			it('should add UserInput type logs', () => {
+				loggerInstance.addChunk('user typed this', false, 'UserInput');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].type).toBe('UserInput');
+				expect(typedLogs[0].content).toBe('user typed this');
+			});
+
+			it('should add UserInputSecret type logs', () => {
+				loggerInstance.addChunk('secret password', false, 'UserInputSecret');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].type).toBe('UserInputSecret');
+				expect(typedLogs[0].content).toBe('secret password');
+			});
+
+			it('should include timestamp in typed log entries', () => {
+				const beforeTime = Date.now();
+				loggerInstance.addChunk('test log', false, 'info');
+				const afterTime = Date.now();
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(1);
+				expect(typedLogs[0].time).toBeGreaterThanOrEqual(beforeTime);
+				expect(typedLogs[0].time).toBeLessThanOrEqual(afterTime);
+			});
+
+			it('should return a copy of typed logs array', () => {
+				loggerInstance.addChunk('log1');
+				loggerInstance.addChunk('log2');
+
+				const firstCopy = loggerInstance.getTypedLogs();
+				const secondCopy = loggerInstance.getTypedLogs();
+
+				expect(firstCopy).not.toBe(secondCopy);
+				expect(firstCopy).toEqual(secondCopy);
+			});
+
+			it('should handle mixed log types in buffer', () => {
+				loggerInstance.addChunk('regular log', false, 'log');
+				loggerInstance.addChunk('error log', true);
+				loggerInstance.addChunk('info log', false, 'info');
+				loggerInstance.addChunk('user input', false, 'UserInput');
+				loggerInstance.addChunk('secret input', false, 'UserInputSecret');
+				loggerInstance.addChunk('warning', false, 'warn');
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(6);
+				expect(typedLogs[0].type).toBe('log');
+				expect(typedLogs[1].type).toBe('error');
+				expect(typedLogs[2].type).toBe('info');
+				expect(typedLogs[3].type).toBe('UserInput');
+				expect(typedLogs[4].type).toBe('UserInputSecret');
+				expect(typedLogs[5].type).toBe('warn');
+			});
+
+			it('should maintain typed logs when buffer exceeds max size', () => {
+				const max3 = new logger(3, 3, '');
+				max3.addChunk('log1', false, 'info');
+				max3.addChunk('log2', false, 'warn');
+				max3.addChunk('log3', false, 'error');
+				max3.addChunk('log4', false, 'debug');
+
+				const typedLogs = max3.getTypedLogs();
+				expect(typedLogs).toHaveLength(3);
+				expect(typedLogs[0].content).toBe('log2');
+				expect(typedLogs[0].type).toBe('warn');
+				expect(typedLogs[1].content).toBe('log3');
+				expect(typedLogs[1].type).toBe('error');
+				expect(typedLogs[2].content).toBe('log4');
+				expect(typedLogs[2].type).toBe('debug');
+			});
+
+			it('should extract content correctly in getLogs from typed entries', () => {
+				loggerInstance.addChunk('first', false, 'info');
+				loggerInstance.addChunk('second', false, 'warn');
+				loggerInstance.addChunk('third', false, 'error');
+
+				expect(loggerInstance.getLogs()).toBe('firstsecondthird');
+			});
+
+			it('should extract content correctly with separator', () => {
+				const separator = '\n';
+				const max3 = new logger(3, 3, separator);
+				max3.addChunk('line1', false, 'log');
+				max3.addChunk('line2', false, 'info');
+				max3.addChunk('line3', false, 'error');
+
+				expect(max3.getLogs()).toBe('line1\nline2\nline3');
+			});
+
+			it('should handle getContextWindow with typed log entries', () => {
+				loggerInstance.addFlag('test-flag', {
+					pattern: 'MATCH',
+					color: 'blue',
+					contextWindowSize: 3,
+				});
+
+				loggerInstance.addChunk('log1', false, 'info');
+				loggerInstance.addChunk('log2', false, 'warn');
+				loggerInstance.addChunk('MATCH here', false, 'log');
+				loggerInstance.addChunk('log4', false, 'error');
+				loggerInstance.addChunk('log5', false, 'debug');
+
+				const flag = loggerInstance.getFlag('test-flag');
+				const match = flag?.matches[0];
+				const context = loggerInstance.getContextWindow(
+					match!.logIndex,
+					match!.contextWindowSize,
+				);
+
+				expect(context).toEqual(['log2', 'MATCH here', 'log4']);
+			});
+
+			it('should reset typed logs on reset', () => {
+				loggerInstance.addChunk('log1', false, 'info');
+				loggerInstance.addChunk('log2', false, 'error');
+
+				expect(loggerInstance.getTypedLogs()).toHaveLength(2);
+
+				loggerInstance.reset();
+
+				expect(loggerInstance.getTypedLogs()).toHaveLength(0);
+			});
+
+			it('should preserve log order with different types', () => {
+				for (let i = 1; i <= 5; i++) {
+					const types: Array<'log' | 'error' | 'info' | 'warn' | 'debug'> = [
+						'log',
+						'error',
+						'info',
+						'warn',
+						'debug',
+					];
+					loggerInstance.addChunk(`log${i}`, false, types[i - 1]);
+				}
+
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toHaveLength(5);
+				for (let i = 0; i < 5; i++) {
+					expect(typedLogs[i].content).toBe(`log${i + 1}`);
+				}
+			});
+
+			it('should handle empty typed logs', () => {
+				const typedLogs = loggerInstance.getTypedLogs();
+				expect(typedLogs).toEqual([]);
+			});
+
+			it('should maintain all log types through buffer eviction', () => {
+				const max3 = new logger(5, 5, '');
+
+				max3.addChunk('1', false, 'log');
+				max3.addChunk('2', false, 'error');
+				max3.addChunk('3', false, 'UserInput');
+				max3.addChunk('4', false, 'UserInputSecret');
+				max3.addChunk('5', false, 'info');
+				max3.addChunk('6', false, 'warn');
+				max3.addChunk('7', false, 'debug');
+
+				const typedLogs = max3.getTypedLogs();
+				expect(typedLogs).toHaveLength(5);
+				expect(typedLogs[0].content).toBe('3');
+				expect(typedLogs[0].type).toBe('UserInput');
+				expect(typedLogs[1].content).toBe('4');
+				expect(typedLogs[1].type).toBe('UserInputSecret');
+				expect(typedLogs[2].content).toBe('5');
+				expect(typedLogs[2].type).toBe('info');
+				expect(typedLogs[3].content).toBe('6');
+				expect(typedLogs[3].type).toBe('warn');
+				expect(typedLogs[4].content).toBe('7');
+				expect(typedLogs[4].type).toBe('debug');
+			});
+		});
+	}
 );
