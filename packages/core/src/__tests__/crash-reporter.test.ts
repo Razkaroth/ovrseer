@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CrashReporter, NoopCrashReporter } from '../crash-reporter';
-import { ProcessLogger } from '../logger';
-import { fakeProcessUnit } from './mocks';
+import { CrashReporter, NoopCrashReporter } from '../crash-reporter.js';
+import { ProcessLogger } from '../logger.js';
+import { fakeProcessUnit } from './mocks.js';
 import type { CrashReport } from '../types';
 import { join } from 'path';
 import { tmpdir } from 'os';
