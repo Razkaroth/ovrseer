@@ -1,4 +1,4 @@
-import {spawn, ChildProcess} from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import {
 	ProcessLoggerI,
 	ProcessStatus,
@@ -145,8 +145,7 @@ export class ProcessUnit {
 					// Reject for crashed processes
 					this._finishedReject(
 						new Error(
-							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${
-								signal ? `signal ${signal}` : `code ${code}`
+							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${signal ? `signal ${signal}` : `code ${code}`
 							}`,
 						),
 					);
@@ -329,6 +328,7 @@ export class ProcessUnit {
 
 		this._status = 'stopping';
 
+
 		// Send the signal to the process
 		const success = this.process?.kill(signal);
 
@@ -431,6 +431,8 @@ export class ProcessUnit {
 
 			return;
 		}
+
+		console.log('not running')
 
 		// If the process is not running (completed, stopped, crashed, etc.),
 		// simply prepare and start immediately

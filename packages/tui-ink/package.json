@@ -27,7 +27,9 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"lint": "prettier --check .",
-		"test": "vitest run"
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
 		"@ovrseer/core": "workspace:*",
@@ -40,6 +42,7 @@
 		"@types/react": "^18.0.32",
 		"ink-testing-library": "^4.0.0",
 		"typescript": "^5.0.3",
-		"vitest": "^1.6.1"
+		"@vitest/ui": "^3.2.4",
+		"vitest": "^3.2.3"
 	}
 }

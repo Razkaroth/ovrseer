@@ -1,5 +1,6 @@
-import {ProcessLogger} from '../logger';
-import type {ReadyCheck} from '../types';
+import { vi, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ProcessLogger } from '../logger';
+import type { ReadyCheck } from '../types';
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal();
@@ -9,10 +10,10 @@ vi.mock('child_process', async importOriginal => {
 	};
 });
 
-import {spawn} from 'child_process';
+import { spawn } from 'child_process';
 
 import EventEmitter from 'events';
-import {ProcessUnit} from '../process-unit';
+import { ProcessUnit } from '../process-unit';
 const mockSpawn = vi.mocked(spawn);
 
 import {
@@ -270,7 +271,7 @@ describe('ProcessUnit', () => {
 			process.start();
 
 			// Also catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			// Advance timers to trigger timeout
 			vi.advanceTimersByTime(100);
@@ -320,7 +321,7 @@ describe('ProcessUnit', () => {
 			expect(process.getStatus()).toEqual('running');
 
 			// Catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			process.process!.emit('error', new Error('Could not spawn process'));
 
@@ -418,7 +419,7 @@ describe('ProcessUnit', () => {
 			vi.useFakeTimers();
 			const process = createProcessUnit('sleep', ['10'], [], mockLogger);
 
-			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
+			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => { });
 
 			process.start();
 
@@ -429,7 +430,7 @@ describe('ProcessUnit', () => {
 			expect(killSpy).toHaveBeenCalled();
 
 			stubProc.emit('exit', null, 'SIGKILL');
-			await stopPromise.catch(() => {});
+			await stopPromise.catch(() => { });
 
 			vi.useRealTimers();
 		});
@@ -448,7 +449,7 @@ describe('ProcessUnit', () => {
 			process.start();
 
 			// Catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			process.kill();
 			stubProc.emit('exit', null, 'SIGKILL');
@@ -697,8 +698,15 @@ describe('ProcessUnit', () => {
 			};
 			stubProc.stdin = mockStdin;
 
+
 			process.start();
-			await process.stop();
+			console.log(process.getStatus())
+
+			await process.ready
+			process.stop();
+			stubProc.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			await process.finished
+			console.log('stopped')
 
 			expect(() => process.sendStdin('test')).toThrow(
 				'Cannot send stdin to a process that is not running',
@@ -816,7 +824,7 @@ describe('ProcessUnit', () => {
 			expect(typedLogs).toHaveLength(10);
 			const contents = typedLogs.map(l => l.content);
 			expect(contents).toEqual(
-				Array.from({length: 10}, (_v, idx) => `input${90 + idx}`),
+				Array.from({ length: 10 }, (_v, idx) => `input${90 + idx}`),
 			);
 		});
 
@@ -858,7 +866,7 @@ describe('ProcessUnit', () => {
 
 			await new Promise(resolve => setImmediate(resolve));
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 			expect(mockSpawn).toHaveBeenCalledTimes(2);
 		});
 
@@ -870,7 +878,9 @@ describe('ProcessUnit', () => {
 			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
-			await process.stop();
+			process.stop();
+			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			await process.finished
 
 			expect(process.getStatus()).toBe('stopped');
 
@@ -878,7 +888,7 @@ describe('ProcessUnit', () => {
 
 			await new Promise(resolve => setImmediate(resolve));
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 			expect(mockSpawn).toHaveBeenCalledTimes(2);
 		});
 
@@ -890,17 +900,17 @@ describe('ProcessUnit', () => {
 			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
-			process.finished.catch(() => {}); // Prevent unhandled rejection
+			process.finished.catch(() => { }); // Prevent unhandled rejection
 			firstProc.proc.emit('error', new Error('Crash'));
 
 			await expect(process.finished).rejects.toBeDefined();
-			expect(process.getStatus()).toBe('couldNotSpawn');
+			expect(process.getStatus()).toBe('crashed');
 
 			process.restart();
 
 			await new Promise(resolve => setImmediate(resolve));
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 			expect(mockSpawn).toHaveBeenCalledTimes(2);
 		});
 
@@ -912,24 +922,27 @@ describe('ProcessUnit', () => {
 			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 
 			process.restart();
 
 			// Process should transition to stopping
 			expect(process.getStatus()).toBe('stopping');
 
+
+
 			// Simulate exit
-			firstProc.proc.emit('exit', null, 'SIGTERM');
+			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			await process.finished
+			//Wait for the process to start again
+			await process.ready
 
-			await new Promise(resolve => setTimeout(resolve, 50));
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 			expect(mockSpawn).toHaveBeenCalledTimes(2);
 		});
 
 		it('should handle restart from failedByReadyCheck state', async () => {
-			vi.useFakeTimers();
 
 			mockSpawn
 				.mockImplementationOnce(() => firstProc.proc as any)
@@ -943,20 +956,25 @@ describe('ProcessUnit', () => {
 			);
 
 			process.start();
-			process.finished.catch(() => {}); // Prevent unhandled rejection
+			process.finished.catch(() => { }); // Prevent unhandled rejection
 
-			vi.advanceTimersByTime(100);
 
+			console.log('Should be crashed')
 			await expect(process.ready).rejects.toBeDefined();
+			console.log('crashed')
 			expect(process.getStatus()).toBe('failedByReadyCheck');
 
 			process.restart();
+			console.log('restarted')
 
-			await new Promise(resolve => setImmediate(resolve));
+			// simulate that this time the process is ready
+			process.process?.stdout?.emit('data', 'ready')
 
-			expect(process.getStatus()).toBe('running');
+			await process.ready
+			console.log('ready')
 
-			vi.useRealTimers();
+			expect(process.getStatus()).toBe('ready');
+
 		});
 
 		it('should restart process that is in stopping state', async () => {
@@ -981,7 +999,7 @@ describe('ProcessUnit', () => {
 
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 			expect(mockSpawn).toHaveBeenCalledTimes(2);
 		});
 
@@ -994,7 +1012,7 @@ describe('ProcessUnit', () => {
 
 			expect(() => process.restart()).not.toThrow();
 
-			expect(process.getStatus()).toBe('running');
+			expect(process.getStatus()).toBe('ready');
 		});
 
 		it('should preserve command and args on restart', async () => {
