@@ -116,7 +116,6 @@ export class NoopCrashReporter implements CrashReporterI {
 	}
 
 	clearReports(): void {
-		/* noop */
 	}
 
 	getReports(): CrashReport[] {
@@ -135,4 +134,4 @@ export class NoopCrashReporter implements CrashReporterI {
 		}
 		return 'main';
 	}
-};
+}
