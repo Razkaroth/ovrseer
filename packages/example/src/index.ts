@@ -122,6 +122,18 @@ pm.addMainProcess('web-server', webServer);
 pm.addMainProcess('api-server', apiServer);
 pm.addMainProcess('worker', worker);
 
+const helloLogger = new ProcessLogger(1000, 100);
+const helloProcess = new ProcessUnit(
+	'node',
+	[
+		'-e',
+		'process.stdin.setEncoding("utf8");process.stdout.write("What is your name?\\n");let buf="";process.stdin.on("data",d=>{buf+=d; if (buf.includes("\\n")){const name = buf.trim();console.log("Hi " + name + "!");process.exit(0);}});',
+	],
+	[],
+	helloLogger,
+);
+pm.addMainProcess('hello', helloProcess);
+
 const cleanupProcess1 = new ProcessUnit(
 	'node',
 	[

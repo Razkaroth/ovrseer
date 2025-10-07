@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import {describe, it, expect} from 'vitest';
 import type {
 	ProcessUnitI,
 	ProcessManagerEvents,
@@ -273,14 +273,14 @@ describe('TUI-Ink Types', () => {
 	describe('TUIRendererI Interface', () => {
 		it('should define required methods', () => {
 			const renderer: TUIRendererI = {
-				init: () => { },
-				destroy: () => { },
-				render: () => { },
-				onKeyPress: () => { },
-				showLogs: () => { },
-				showStatus: () => { },
-				selectPrevious: () => { },
-				selectNext: () => { },
+				init: () => {},
+				destroy: () => {},
+				render: () => {},
+				onKeyPress: () => {},
+				showLogs: () => {},
+				showStatus: () => {},
+				selectPrevious: () => {},
+				selectNext: () => {},
 			};
 
 			expect(typeof renderer.init).toBe('function');
@@ -295,15 +295,15 @@ describe('TUI-Ink Types', () => {
 
 		it('should define optional showInstructions method', () => {
 			const renderer: TUIRendererI = {
-				init: () => { },
-				destroy: () => { },
-				render: () => { },
-				onKeyPress: () => { },
-				showLogs: () => { },
-				showStatus: () => { },
-				showInstructions: () => { },
-				selectPrevious: () => { },
-				selectNext: () => { },
+				init: () => {},
+				destroy: () => {},
+				render: () => {},
+				onKeyPress: () => {},
+				showLogs: () => {},
+				showStatus: () => {},
+				showInstructions: () => {},
+				selectPrevious: () => {},
+				selectNext: () => {},
 			};
 
 			expect(typeof renderer.showInstructions).toBe('function');
@@ -311,14 +311,14 @@ describe('TUI-Ink Types', () => {
 
 		it('should accept implementation without showInstructions', () => {
 			const renderer: TUIRendererI = {
-				init: () => { },
-				destroy: () => { },
-				render: () => { },
-				onKeyPress: () => { },
-				showLogs: () => { },
-				showStatus: () => { },
-				selectPrevious: () => { },
-				selectNext: () => { },
+				init: () => {},
+				destroy: () => {},
+				render: () => {},
+				onKeyPress: () => {},
+				showLogs: () => {},
+				showStatus: () => {},
+				selectPrevious: () => {},
+				selectNext: () => {},
 			};
 
 			expect(renderer.showInstructions).toBeUndefined();
@@ -486,8 +486,8 @@ describe('TUI-Ink Types', () => {
 					type === 'dependency'
 						? map.dependencies
 						: type === 'main'
-							? map.main
-							: map.cleanup;
+						? map.main
+						: map.cleanup;
 				targetMap.set(`proc${idx}`, mockProcess);
 			});
 
@@ -500,9 +500,9 @@ describe('TUI-Ink Types', () => {
 	describe('Type Compatibility', () => {
 		it('should allow TUIState in arrays', () => {
 			const states: TUIState[] = [
-				{ selectedProcessId: 'proc1' },
-				{ selectedProcessId: 'proc2', selectedProcessType: 'main' },
-				{ showHelp: true },
+				{selectedProcessId: 'proc1'},
+				{selectedProcessId: 'proc2', selectedProcessType: 'main'},
+				{showHelp: true},
 			];
 
 			expect(states).toHaveLength(3);

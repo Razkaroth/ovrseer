@@ -6,6 +6,7 @@ import type {
 	TUIState,
 	TUIKeyPressMeta,
 	TUIProcessType,
+	LogEntry,
 } from './types.js';
 import {InkTUIRenderer} from './InkTUIRenderer.js';
 
@@ -19,8 +20,11 @@ export class InkTUIWrapper implements TUIRendererI {
 	};
 	private currentState: TUIState = {};
 	private statusMessage = 'Ready';
-	private logsData: {id: string; type: TUIProcessType; content: string} | null =
-		null;
+	private logsData: {
+		id: string;
+		type: TUIProcessType;
+		logs: LogEntry[];
+	} | null = null;
 
 	init(): void {
 		if (this.renderInstance) return;
@@ -83,8 +87,12 @@ export class InkTUIWrapper implements TUIRendererI {
 		}
 	}
 
-	showLogs(processId: string, processType: TUIProcessType, logs: string): void {
-		this.logsData = {id: processId, type: processType, content: logs};
+	showLogs(
+		processId: string,
+		processType: TUIProcessType,
+		logs: LogEntry[],
+	): void {
+		this.logsData = {id: processId, type: processType, logs};
 		this.render(this.currentProcesses, this.currentState);
 	}
 

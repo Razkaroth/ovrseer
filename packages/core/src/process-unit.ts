@@ -1,4 +1,4 @@
-import {spawn, ChildProcess} from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import {
 	ProcessLoggerI,
 	ProcessStatus,
@@ -92,7 +92,7 @@ export class ProcessUnit {
 		}
 
 		this._process = spawn(this.command, this.args, {
-			stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout and stderr piped
+			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 
 		this._status = 'running';
@@ -145,8 +145,7 @@ export class ProcessUnit {
 					// Reject for crashed processes
 					this._finishedReject(
 						new Error(
-							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${
-								signal ? `signal ${signal}` : `code ${code}`
+							`Process ${this._wasKilled ? 'killed' : 'crashed'} with ${signal ? `signal ${signal}` : `code ${code}`
 							}`,
 						),
 					);
@@ -317,7 +316,7 @@ export class ProcessUnit {
 	}
 
 	async stop(
-		timeout: number = 1000,
+		timeout: number = 2000,
 		signal: StopSignal = 'SIGINT',
 	): Promise<void> {
 		if (!this.isRunning()) {
@@ -328,6 +327,7 @@ export class ProcessUnit {
 		}
 
 		this._status = 'stopping';
+
 
 		// Send the signal to the process
 		const success = this.process?.kill(signal);
@@ -414,22 +414,30 @@ export class ProcessUnit {
 	}
 
 	restart(): void {
-		if (!this.isRunning() && this._status !== 'stopping') {
-			throw new Error('Cannot restart: process is not running');
+		// If the process is running (or stopping), stop it first then restart when finished
+		if (this.isRunning() || this._status === 'stopping') {
+			// Stop the process and wait for it to exit, then restart
+			this.stop();
+
+			// Wait for the process to finish, then prepare and restart
+			this.finished
+				.catch(() => {
+					// Ignore errors during stop
+				})
+				.finally(() => {
+					this.prepareForRestart();
+					this.start();
+				});
+
+			return;
 		}
 
-		// Stop the process and wait for it to exit, then restart
-		this.stop();
+		console.log('not running')
 
-		// Wait for the process to finish, then prepare and restart
-		this.finished
-			.catch(() => {
-				// Ignore errors during stop
-			})
-			.finally(() => {
-				this.prepareForRestart();
-				this.start();
-			});
+		// If the process is not running (completed, stopped, crashed, etc.),
+		// simply prepare and start immediately
+		this.prepareForRestart();
+		this.start();
 	}
 
 	isRunning(): boolean {
@@ -438,5 +446,26 @@ export class ProcessUnit {
 
 	getStatus(): ProcessStatus {
 		return this._status;
+	}
+
+	sendStdin(input: string, secret: boolean = false): void {
+		if (!this._process || !this._process.stdin) {
+			throw new Error('Process stdin is not available');
+		}
+
+		if (!this.isRunning()) {
+			throw new Error('Cannot send stdin to a process that is not running');
+		}
+
+		try {
+			this._process.stdin.write(input + '\n');
+			this.logger.addChunk(
+				input,
+				false,
+				secret ? 'UserInputSecret' : 'UserInput',
+			);
+		} catch (error: any) {
+			throw new Error(`Failed to write to stdin: ${error.message}`);
+		}
 	}
 }

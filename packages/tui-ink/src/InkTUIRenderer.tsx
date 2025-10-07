@@ -7,6 +7,8 @@ import type {
 	TUIKeyPressMeta,
 	ProcessUnitI,
 	FlagState,
+	LogEntry,
+	LogType,
 } from './types.js';
 
 type ProcessItem = {
@@ -19,7 +21,7 @@ type InkTUIRendererProps = {
 	processes: ProcessMap;
 	state: TUIState;
 	statusMessage?: string;
-	logsData?: {id: string; type: TUIProcessType; content: string} | null;
+	logsData?: {id: string; type: TUIProcessType; logs: LogEntry[]} | null;
 	onKeyPress?: (key: string, meta?: TUIKeyPressMeta) => void;
 };
 
@@ -208,9 +210,9 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		}
 	}, [state.selectedProcessId, state.selectedProcessType, processItems]);
 
-	const logLines = useMemo(() => {
+	const logEntries = useMemo(() => {
 		if (!logsData) return [];
-		return logsData.content.split('\n');
+		return logsData.logs;
 	}, [logsData]);
 
 	const maxLogLines = Math.max(1, terminalHeight - 10);
@@ -221,23 +223,43 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		: false;
 
 	useEffect(() => {
-		if (isTailing && logsData && logLines.length > maxLogLines) {
-			setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+		if (isTailing && logsData && logEntries.length > maxLogLines) {
+			setLogScrollOffset(Math.max(0, logEntries.length - maxLogLines));
 		}
-	}, [logLines, isTailing, logsData, maxLogLines]);
+	}, [logEntries, isTailing, logsData, maxLogLines]);
 
-	const visibleLogLines = useMemo(() => {
+	const visibleLogEntries = useMemo(() => {
 		const start = logScrollOffset;
 		const end = start + maxLogLines;
-		return logLines.slice(start, end);
-	}, [logLines, logScrollOffset, maxLogLines]);
+		return logEntries.slice(start, end);
+	}, [logEntries, logScrollOffset, maxLogLines]);
 
 	useInput(
 		(input, key) => {
 			if (!onKeyPress) return;
 
+			if (state.inputMode) {
+				if (key.escape) {
+					onKeyPress('input-cancel');
+				} else if (key.return) {
+					onKeyPress('input-submit');
+				} else if (key.ctrl && input === 's') {
+					onKeyPress('input-toggle-secret');
+				} else if (key.backspace || key.delete) {
+					onKeyPress('input-backspace');
+				} else if (input && input.length === 1 && !key.ctrl && !key.meta) {
+					onKeyPress('input-char', {
+						processInfo: undefined,
+						index: input.charCodeAt(0),
+					});
+				}
+				return;
+			}
+
 			if (input === 'q' || (key.ctrl && input === 'c')) {
 				onKeyPress(key.ctrl && input === 'c' ? 'C-c' : 'q');
+			} else if (input === 'i') {
+				onKeyPress('i');
 			} else if (input === 's') {
 				onKeyPress('s');
 			} else if (input === 'r') {
@@ -252,8 +274,8 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 						newMap.set(currentProcessKey, newTailing);
 						return newMap;
 					});
-					if (newTailing && logLines.length > maxLogLines) {
-						setLogScrollOffset(Math.max(0, logLines.length - maxLogLines));
+					if (newTailing && logEntries.length > maxLogLines) {
+						setLogScrollOffset(Math.max(0, logEntries.length - maxLogLines));
 					}
 				}
 			} else if (key.return) {
@@ -300,7 +322,7 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					}
 					setLogScrollOffset(
 						Math.min(
-							Math.max(0, logLines.length - maxLogLines),
+							Math.max(0, logEntries.length - maxLogLines),
 							logScrollOffset + 1,
 						),
 					);
@@ -354,10 +376,30 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 				}
 				setLogScrollOffset(
 					Math.min(
-						Math.max(0, logLines.length - maxLogLines),
+						Math.max(0, logEntries.length - maxLogLines),
 						logScrollOffset + maxLogLines,
 					),
 				);
+			} else if (key.ctrl && input === 'n') {
+				const newIndex = Math.min(processItems.length - 1, selectedIndex + 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
+			} else if (key.ctrl && input === 'p') {
+				const newIndex = Math.max(0, selectedIndex - 1);
+				setSelectedIndex(newIndex);
+				if (processItems[newIndex]) {
+					const item = processItems[newIndex];
+					onKeyPress('select', {
+						index: newIndex,
+						processInfo: {id: item.id, type: item.type},
+					});
+				}
 			} else if (input === 'f') {
 				onKeyPress('f');
 			} else if (input === 'm') {
@@ -430,12 +472,32 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	};
 
 	const scrollInfo =
-		logsData && logLines.length > maxLogLines
+		logsData && logEntries.length > maxLogLines
 			? ` [${logScrollOffset + 1}-${Math.min(
 					logScrollOffset + maxLogLines,
-					logLines.length,
-			  )}/${logLines.length}]`
+					logEntries.length,
+			  )}/${logEntries.length}]`
 			: '';
+
+	const renderInputField = () => {
+		if (!state.inputMode) return null;
+		const displayValue = state.inputSecretMode
+			? '*'.repeat(state.inputValue?.length ?? 0)
+			: state.inputValue ?? '';
+		const modeLabel = state.inputSecretMode ? 'Secret Input' : 'Input';
+		return (
+			<Box borderStyle="single" borderColor="yellow" paddingX={1}>
+				<Text bold color="yellow">
+					{modeLabel}:{' '}
+				</Text>
+				<Text>{displayValue}</Text>
+				<Text dimColor>
+					{' '}
+					(Enter: submit, Esc: cancel, Ctrl+S: toggle secret)
+				</Text>
+			</Box>
+		);
+	};
 
 	return (
 		<Box flexDirection="column" width={terminalWidth} height={terminalHeight}>
@@ -493,19 +555,50 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 										{logsData.type}:{logsData.id}
 									</Text>
 									<Box flexDirection="column" marginTop={1} flexGrow={1}>
-										{visibleLogLines.map((line, idx) => {
+										{visibleLogEntries.map((entry, idx) => {
 											const actualLineNumber = logScrollOffset + idx + 1;
+											const getLogColor = (
+												type: LogType,
+											):
+												| 'red'
+												| 'yellow'
+												| 'blue'
+												| 'cyan'
+												| 'magenta'
+												| undefined => {
+												switch (type) {
+													case 'error':
+														return 'red';
+													case 'warn':
+														return 'yellow';
+													case 'info':
+														return 'blue';
+													case 'UserInput':
+														return 'cyan';
+													case 'UserInputSecret':
+														return 'magenta';
+													case 'debug':
+														return 'magenta';
+													default:
+														return undefined;
+												}
+											};
+											const displayContent =
+												entry.type === 'UserInputSecret'
+													? '***'
+													: entry.content;
+											const color = getLogColor(entry.type);
 											return (
 												<Text key={actualLineNumber}>
 													<Text dimColor>
 														{String(actualLineNumber).padStart(4, ' ')}│
 													</Text>
-													{line}
+													<Text color={color}>{displayContent}</Text>
 												</Text>
 											);
 										})}
 									</Box>
-									{logLines.length > maxLogLines && (
+									{logEntries.length > maxLogLines && (
 										<Box>
 											<Text dimColor>
 												j/k/↑/↓ scroll line | PgUp/PgDn scroll page | t toggle
@@ -650,10 +743,12 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 			</Box>
 
 			<Box flexDirection="column">
+				{renderInputField()}
 				<Box borderStyle="single" borderColor="gray" paddingX={1}>
 					<Text dimColor>
-						J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail | enter
-						logs | f toggle flags | r restart | R/C-r restart all | q quit
+						i input | J/K/C-↑/C-↓ change process | j/k/↑/↓ scroll logs | t tail
+						| enter logs | f toggle flags | r restart | R/C-r restart all | q
+						quit
 					</Text>
 				</Box>
 				<Box borderStyle="single" borderColor="cyan" paddingX={1}>

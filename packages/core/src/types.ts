@@ -53,6 +53,8 @@ export interface ProcessUnitI {
 	// to ensure no leaks between runs.
 	cleanup(): void;
 
+	sendStdin(input: string, secret?: boolean): void;
+
 	// Event-like methods for lifecycle hooks
 	onExit(
 		callback: (code: number | null, signal: NodeJS.Signals | null) => void,
@@ -62,6 +64,21 @@ export interface ProcessUnitI {
 }
 
 export type StopSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';
+
+export type LogType =
+	| 'log'
+	| 'error'
+	| 'info'
+	| 'warn'
+	| 'debug'
+	| 'UserInput'
+	| 'UserInputSecret';
+
+export interface LogEntry {
+	content: string;
+	type: LogType;
+	time: number;
+}
 
 export type ProcessStatus =
 	| 'created'
@@ -85,7 +102,8 @@ export interface ProcessLoggerI {
 	onLog(listener: (chunk: string) => void): () => void;
 	onError(listener: (chunk: string) => void): () => void;
 	getLogs(options?: getLogsParams): string;
-	addChunk(chunk: string, isError?: boolean): void;
+	getTypedLogs(): LogEntry[];
+	addChunk(chunk: string, isError?: boolean, type?: LogType): void;
 	reset(): void;
 
 	addFlag(name: string, flag: Flag): void;

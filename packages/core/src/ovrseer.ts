@@ -624,6 +624,19 @@ export class Ovrseer implements OvrseerI {
 		return undefined;
 	}
 
+	sendStdin(processId: string, input: string, secret: boolean = false): void {
+		const process =
+			this.mainProcesses.get(processId) ??
+			this.dependencies.get(processId) ??
+			this.cleanupProcesses.get(processId);
+
+		if (!process) {
+			throw new Error(`Process with id "${processId}" not found`);
+		}
+
+		process.sendStdin(input, secret);
+	}
+
 	private waitForPromiseWithTimeout<T>(
 		promise: Promise<T>,
 		timeout: number,

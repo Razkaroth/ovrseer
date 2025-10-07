@@ -80,11 +80,27 @@ export interface FlagState {
 	matches: FlagMatch[];
 }
 
+export type LogType =
+	| 'log'
+	| 'error'
+	| 'info'
+	| 'warn'
+	| 'debug'
+	| 'UserInput'
+	| 'UserInputSecret';
+
+export interface LogEntry {
+	content: string;
+	type: LogType;
+	time: number;
+}
+
 export interface ProcessLoggerI {
 	onLog(listener: (chunk: string) => void): () => void;
 	onError(listener: (chunk: string) => void): () => void;
 	getLogs(options?: getLogsParams): string;
-	addChunk(chunk: string, isError?: boolean): void;
+	getTypedLogs(): LogEntry[];
+	addChunk(chunk: string, isError?: boolean, type?: LogType): void;
 	reset(): void;
 
 	addFlag(name: string, flag: Flag): void;
@@ -260,6 +276,9 @@ export interface TUIState {
 	selectedFlagNode?: string;
 	expandedFlagNodes?: Set<string>;
 	matchContextVisible?: Set<string>;
+	inputMode?: boolean;
+	inputValue?: string;
+	inputSecretMode?: boolean;
 }
 
 export interface TUIKeyPressMeta {
@@ -300,7 +319,11 @@ export interface TUIRendererI {
 	/**
 	 * Show logs for the selected process. The implementation decides paging.
 	 */
-	showLogs(processId: string, processType: TUIProcessType, logs: string): void;
+	showLogs(
+		processId: string,
+		processType: TUIProcessType,
+		logs: LogEntry[],
+	): void;
 
 	showStatus(message: string): void;
 

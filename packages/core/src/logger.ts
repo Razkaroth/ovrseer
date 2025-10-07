@@ -1,8 +1,15 @@
 import EventEmitter from 'events';
-import {ProcessLoggerI, Flag, FlagState, FlagMatch} from './types.js';
+import {
+	ProcessLoggerI,
+	Flag,
+	FlagState,
+	FlagMatch,
+	LogEntry,
+	LogType,
+} from './types.js';
 
 export class ProcessLogger implements ProcessLoggerI {
-	private _buffer: string[] = [];
+	private _buffer: LogEntry[] = [];
 	private _errorBuffer: string[] = [];
 	private readonly _maxLogSize: number;
 	private _maxBufferSize: number;
@@ -45,12 +52,20 @@ export class ProcessLogger implements ProcessLoggerI {
 		this._eventEmitter = new EventEmitter();
 	}
 
-	public addChunk(chunk: string, isError?: boolean) {
-		this._buffer.push(chunk);
+	public addChunk(chunk: string, isError?: boolean, type?: LogType) {
+		let logType: LogType = type || 'log';
+		if (!type && isError) {
+			logType = 'error';
+		}
 
-		// If buffer exceeds max size, evict the oldest entry first and
-		// adjust stored match indices so they remain consistent with the
-		// shifted buffer (decrement indices by 1 and drop any that go < 0).
+		const entry: LogEntry = {
+			content: chunk,
+			type: logType,
+			time: Date.now(),
+		};
+
+		this._buffer.push(entry);
+
 		if (this._buffer.length > this._maxBufferSize) {
 			this._buffer.shift();
 			for (const [_name, flagState] of this._flags) {
@@ -61,7 +76,6 @@ export class ProcessLogger implements ProcessLoggerI {
 						match.logIndex = newIndex;
 						newMatches.push(match);
 					} else {
-						// match was evicted from the buffer; decrement count defensively
 						flagState.count = Math.max(0, flagState.count - 1);
 					}
 				}
@@ -115,6 +129,7 @@ export class ProcessLogger implements ProcessLoggerI {
 			return this._buffer
 				.slice(reversedIndex - numberOfLinesToReturn, reversedIndex)
 				.reverse()
+				.map(entry => entry.content)
 				.join(separator);
 		} else {
 			const startIndex = index;
@@ -125,8 +140,13 @@ export class ProcessLogger implements ProcessLoggerI {
 
 			return this._buffer
 				.slice(startIndex, startIndex + numberOfLinesToReturn)
+				.map(entry => entry.content)
 				.join(separator);
 		}
+	}
+
+	public getTypedLogs(): LogEntry[] {
+		return this._buffer.slice();
 	}
 
 	public onLog(listener: (chunk: string) => void) {
@@ -204,7 +224,7 @@ export class ProcessLogger implements ProcessLoggerI {
 
 		const contextLogs: string[] = [];
 		for (let i = start; i < end; i++) {
-			contextLogs.push(this._buffer[i]);
+			contextLogs.push(this._buffer[i].content);
 		}
 		return contextLogs;
 	}

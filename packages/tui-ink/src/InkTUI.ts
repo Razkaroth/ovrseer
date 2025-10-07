@@ -168,9 +168,9 @@ export class InkTUI extends InkTUIWrapper {
 			) {
 				const process = this.getProcessByIdAndType(data.id, data.type);
 				if (process) {
-					let logs = 'No logs available';
+					let logs = [];
 					try {
-						logs = process.logger.getLogs();
+						logs = process.logger.getTypedLogs();
 					} catch {}
 					this.showLogs(data.id, data.type, logs);
 				}
@@ -178,7 +178,56 @@ export class InkTUI extends InkTUIWrapper {
 		}) as any);
 
 		this.onKeyPress(async (key: string, meta?: TUIKeyPressMeta) => {
-			if (key === 'q' || key === 'C-c') {
+			if (key === 'i') {
+				this.managedState.inputMode = true;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-cancel') {
+				this.managedState.inputMode = false;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-submit') {
+				const inputValue = this.managedState.inputValue ?? '';
+				const isSecret = this.managedState.inputSecretMode ?? false;
+				if (
+					this.managedState.selectedProcessId &&
+					this.managedState.selectedProcessType &&
+					this.manager
+				) {
+					const process = this.getProcessByIdAndType(
+						this.managedState.selectedProcessId,
+						this.managedState.selectedProcessType,
+					);
+					if (process && typeof (process as any).sendStdin === 'function') {
+						try {
+							(process as any).sendStdin(inputValue, isSecret);
+							this.showStatus(
+								`Sent input to ${this.managedState.selectedProcessId}`,
+							);
+						} catch (e: any) {
+							this.showStatus(`Failed to send input: ${e.message}`);
+						}
+					}
+				}
+				this.managedState.inputMode = false;
+				this.managedState.inputValue = '';
+				this.managedState.inputSecretMode = false;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-toggle-secret') {
+				this.managedState.inputSecretMode = !this.managedState.inputSecretMode;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-backspace') {
+				const currentValue = this.managedState.inputValue ?? '';
+				this.managedState.inputValue = currentValue.slice(0, -1);
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'input-char' && meta?.index !== undefined) {
+				const char = String.fromCharCode(meta.index);
+				this.managedState.inputValue =
+					(this.managedState.inputValue ?? '') + char;
+				this.render(this.managedProcesses, this.managedState);
+			} else if (key === 'q' || key === 'C-c') {
 				if (this.manager) {
 					await this.manager.stop();
 				}
@@ -186,7 +235,16 @@ export class InkTUI extends InkTUIWrapper {
 				process.exit(0);
 			} else if (key === 's') {
 				if (this.manager) {
-					this.manager.start();
+					try {
+						const res: any = this.manager.start();
+						if (res && typeof res.then === 'function') {
+							res.catch((e: any) => {
+								this.showStatus(e?.message ?? String(e));
+							});
+						}
+					} catch (e: any) {
+						this.showStatus(e?.message ?? String(e));
+					}
 				}
 			} else if (key === 'r') {
 				if (
@@ -215,9 +273,9 @@ export class InkTUI extends InkTUIWrapper {
 						this.managedState.selectedProcessType,
 					);
 					if (process) {
-						let logs = 'No logs available';
+						let logs = [];
 						try {
-							logs = process.logger.getLogs();
+							logs = process.logger.getTypedLogs();
 						} catch {}
 						this.showLogs(
 							this.managedState.selectedProcessId,
@@ -282,7 +340,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'dependency') {
 			const existing = this.managedProcesses.dependencies.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getDependency === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getDependency === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getDependency(id);
 					if (p) {
@@ -296,7 +357,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'main') {
 			const existing = this.managedProcesses.main.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getMainProcess === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getMainProcess === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getMainProcess(id);
 					if (p) {
@@ -310,7 +374,10 @@ export class InkTUI extends InkTUIWrapper {
 		if (type === 'cleanup') {
 			const existing = this.managedProcesses.cleanup.get(id);
 			if (existing) return existing;
-			if (this.manager && typeof (this.manager as any).getCleanupProcess === 'function') {
+			if (
+				this.manager &&
+				typeof (this.manager as any).getCleanupProcess === 'function'
+			) {
 				try {
 					const p = (this.manager as any).getCleanupProcess(id);
 					if (p) {

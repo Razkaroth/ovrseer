@@ -1,5 +1,6 @@
-import {ProcessLogger} from '../logger';
-import type {ReadyCheck} from '../types';
+import { vi, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ProcessLogger } from '../logger';
+import type { ReadyCheck } from '../types';
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal();
@@ -9,10 +10,10 @@ vi.mock('child_process', async importOriginal => {
 	};
 });
 
-import {spawn} from 'child_process';
+import { spawn } from 'child_process';
 
 import EventEmitter from 'events';
-import {ProcessUnit} from '../process-unit';
+import { ProcessUnit } from '../process-unit';
 const mockSpawn = vi.mocked(spawn);
 
 import {
@@ -270,7 +271,7 @@ describe('ProcessUnit', () => {
 			process.start();
 
 			// Also catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			// Advance timers to trigger timeout
 			vi.advanceTimersByTime(100);
@@ -320,7 +321,7 @@ describe('ProcessUnit', () => {
 			expect(process.getStatus()).toEqual('running');
 
 			// Catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			process.process!.emit('error', new Error('Could not spawn process'));
 
@@ -418,18 +419,19 @@ describe('ProcessUnit', () => {
 			vi.useFakeTimers();
 			const process = createProcessUnit('sleep', ['10'], [], mockLogger);
 
-			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {});
+			const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => { });
 
 			process.start();
 
 			const stopPromise = process.stop(100);
+			stopPromise.catch(() => { }); // Swallow the rejection
 
 			await vi.advanceTimersByTimeAsync(101);
 
 			expect(killSpy).toHaveBeenCalled();
 
 			stubProc.emit('exit', null, 'SIGKILL');
-			await stopPromise.catch(() => {});
+			await stopPromise.catch(() => { });
 
 			vi.useRealTimers();
 		});
@@ -448,7 +450,7 @@ describe('ProcessUnit', () => {
 			process.start();
 
 			// Catch the finished promise rejection to prevent unhandled rejection
-			process.finished.catch(() => {}); // Swallow the rejection
+			process.finished.catch(() => { }); // Swallow the rejection
 
 			process.kill();
 			stubProc.emit('exit', null, 'SIGKILL');
@@ -538,6 +540,515 @@ describe('ProcessUnit', () => {
 			process.start();
 			expect(process.getStatus()).toEqual('running');
 			expect(process.process).not.toBeNull();
+		});
+
+		it('should restart after normal completion (completed -> running)', async () => {
+			const process = createProcessUnit(
+				'echo',
+				['hello'],
+				[simpleReadyCheck],
+				mockLogger,
+			);
+
+			process.start();
+
+			// Simulate normal exit
+			stubProc.emit('exit', 0);
+
+			await expect(process.finished).resolves.toBeUndefined();
+
+			// Now call restart() which should prepare and start again
+			process.restart();
+
+			// Allow the restart flow to run (promises/microtasks)
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(process.getStatus()).toEqual('running');
+			expect(process.process).not.toBeNull();
+		});
+	});
+
+	describe('sendStdin()', () => {
+		it('should throw if process is not started', () => {
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			expect(() => process.sendStdin('test input')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+
+		it('should write input to stdin and append newline', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('test input');
+
+			expect(mockStdin.write).toHaveBeenCalledWith('test input\n');
+		});
+
+		it('should log input as UserInput type by default', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('test input');
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLog = typedLogs.find(log => log.type === 'UserInput');
+
+			expect(userInputLog).toBeDefined();
+			expect(userInputLog!.content).toBe('test input');
+		});
+
+		it('should log input as UserInputSecret type when secret is true', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('secret password', true);
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const secretLog = typedLogs.find(log => log.type === 'UserInputSecret');
+
+			expect(secretLog).toBeDefined();
+			expect(secretLog!.content).toBe('secret password');
+		});
+
+		it('should handle multiple stdin writes', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('first input');
+			process.sendStdin('second input');
+			process.sendStdin('third input', true);
+
+			expect(mockStdin.write).toHaveBeenCalledTimes(3);
+			expect(mockStdin.write).toHaveBeenNthCalledWith(1, 'first input\n');
+			expect(mockStdin.write).toHaveBeenNthCalledWith(2, 'second input\n');
+			expect(mockStdin.write).toHaveBeenNthCalledWith(3, 'third input\n');
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLogs = typedLogs.filter(log => log.type === 'UserInput');
+			const secretLogs = typedLogs.filter(
+				log => log.type === 'UserInputSecret',
+			);
+
+			expect(userInputLogs).toHaveLength(2);
+			expect(secretLogs).toHaveLength(1);
+		});
+
+		it('should throw if stdin is null', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			stubProc.stdin = null;
+
+			process.start();
+
+			expect(() => process.sendStdin('test input')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+
+		it('should include timestamp in logged entry', async () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			const beforeTime = Date.now();
+			process.start();
+			process.sendStdin('test input');
+			const afterTime = Date.now();
+
+			const typedLogs = mockLogger.getTypedLogs();
+			const userInputLog = typedLogs.find(log => log.type === 'UserInput');
+
+			expect(userInputLog).toBeDefined();
+			expect(userInputLog!.time).toBeGreaterThanOrEqual(beforeTime);
+			expect(userInputLog!.time).toBeLessThanOrEqual(afterTime);
+		});
+	});
+
+	describe('sendStdin() - Additional Edge Cases', () => {
+		it('should throw if process has not been started', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+
+			expect(() => process.sendStdin('test')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+
+		it('should throw if attempting to send to stopped process', async () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+
+			process.start();
+			console.log(process.getStatus())
+
+			await process.ready
+			process.stop();
+			stubProc.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			await process.finished
+			console.log('stopped')
+
+			expect(() => process.sendStdin('test')).toThrow(
+				'Cannot send stdin to a process that is not running',
+			);
+		});
+
+		it('should throw with descriptive error if write fails', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(() => {
+					throw new Error('Write failed: pipe broken');
+				}),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+
+			expect(() => process.sendStdin('test')).toThrow(
+				'Failed to write to stdin: Write failed: pipe broken',
+			);
+		});
+
+		it('should handle empty string input', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('');
+
+			expect(mockStdin.write).toHaveBeenCalledWith('\n');
+		});
+
+		it('should handle multiline input', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('line1\nline2\nline3');
+
+			expect(mockStdin.write).toHaveBeenCalledWith('line1\nline2\nline3\n');
+		});
+
+		it('should handle special characters in input', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			const specialInput = '\!@#$%^&*(){}[]|\\:;"\'<>,.?/~`';
+			process.sendStdin(specialInput);
+
+			expect(mockStdin.write).toHaveBeenCalledWith(specialInput + '\n');
+		});
+
+		it('should handle unicode characters', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			const unicodeInput = '你好世界 🌍 émojis';
+			process.sendStdin(unicodeInput);
+
+			expect(mockStdin.write).toHaveBeenCalledWith(unicodeInput + '\n');
+		});
+
+		it('should properly log both secret and non-secret inputs in sequence', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+			process.sendStdin('username', false);
+			process.sendStdin('password', true);
+			process.sendStdin('confirm', false);
+
+			const typedLogs = mockLogger.getTypedLogs();
+			expect(typedLogs).toHaveLength(3);
+			expect(typedLogs[0].type).toBe('UserInput');
+			expect(typedLogs[0].content).toBe('username');
+			expect(typedLogs[1].type).toBe('UserInputSecret');
+			expect(typedLogs[1].content).toBe('password');
+			expect(typedLogs[2].type).toBe('UserInput');
+			expect(typedLogs[2].content).toBe('confirm');
+		});
+
+		it('should handle rapid sequential stdin writes', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+
+			for (let i = 0; i < 100; i++) {
+				process.sendStdin(`input${i}`);
+			}
+
+			expect(mockStdin.write).toHaveBeenCalledTimes(100);
+			const typedLogs = mockLogger.getTypedLogs();
+			// Logger has a buffer cap of 10, so only the last 10 entries are retained
+			expect(typedLogs).toHaveLength(10);
+			const contents = typedLogs.map(l => l.content);
+			expect(contents).toEqual(
+				Array.from({ length: 10 }, (_v, idx) => `input${90 + idx}`),
+			);
+		});
+
+		it('should throw if stdin is undefined', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			stubProc.stdin = undefined;
+
+			process.start();
+
+			expect(() => process.sendStdin('test')).toThrow(
+				'Process stdin is not available',
+			);
+		});
+	});
+
+	describe('restart() - Enhanced Behavior', () => {
+		let firstProc: ReturnType<typeof makeStubProc>;
+		let secondProc: ReturnType<typeof makeStubProc>;
+
+		beforeEach(() => {
+			firstProc = makeStubProc();
+			secondProc = makeStubProc();
+		});
+
+		it('should restart when process is in completed state', async () => {
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			process.start();
+			firstProc.proc.emit('exit', 0);
+			await process.finished;
+
+			expect(process.getStatus()).toBe('completed');
+
+			process.restart();
+
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(process.getStatus()).toBe('ready');
+			expect(mockSpawn).toHaveBeenCalledTimes(2);
+		});
+
+		it('should restart when process is in stopped state', async () => {
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			process.start();
+
+			const stopPromise = process.stop();
+			stopPromise.catch(() => { }); // Swallow the rejection
+			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			await process.finished
+
+			expect(process.getStatus()).toBe('stopped');
+
+			process.restart();
+
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(process.getStatus()).toBe('ready');
+			expect(mockSpawn).toHaveBeenCalledTimes(2);
+		});
+
+		it('should restart when process is in crashed state', async () => {
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			process.start();
+			process.finished.catch(() => { }); // Prevent unhandled rejection
+			firstProc.proc.emit('error', new Error('Crash'));
+
+			await expect(process.finished).rejects.toBeDefined();
+			expect(process.getStatus()).toBe('crashed');
+
+			process.restart();
+
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(process.getStatus()).toBe('ready');
+			expect(mockSpawn).toHaveBeenCalledTimes(2);
+		});
+
+		it('should stop and restart when called on running process', async () => {
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			process.start();
+			expect(process.getStatus()).toBe('ready');
+
+			process.process!.kill = vi.fn(() => true);
+
+			process.restart();
+			expect(process.getStatus()).toBe('stopping');
+			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			// Process should transition to stopping
+			// Simulate exit
+			await process.finished
+			//Wait for the process to start again
+			await process.ready
+
+
+
+			expect(process.getStatus()).toBe('ready');
+			expect(mockSpawn).toHaveBeenCalledTimes(2);
+		});
+
+		it('should handle restart from failedByReadyCheck state', async () => {
+
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit(
+				'echo',
+				['hello'],
+				[timeoutReadyCheck],
+				mockLogger,
+			);
+
+			process.start();
+			process.finished.catch(() => { }); // Prevent unhandled rejection
+
+
+			console.log('Should be crashed')
+			await expect(process.ready).rejects.toBeDefined();
+			console.log('crashed')
+			expect(process.getStatus()).toBe('failedByReadyCheck');
+
+			process.restart();
+			console.log('restarted')
+
+			// simulate that this time the process is ready
+			process.process?.stdout?.emit('data', 'ready')
+
+			await process.ready
+			console.log('ready')
+
+			expect(process.getStatus()).toBe('ready');
+
+		});
+
+
+		it('should not throw when restarting from created state', () => {
+			mockSpawn.mockImplementationOnce(() => firstProc.proc as any);
+
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			expect(process.getStatus()).toBe('created');
+
+			expect(() => process.restart()).not.toThrow();
+
+			expect(process.getStatus()).toBe('ready');
+		});
+
+		it('should preserve command and args on restart', async () => {
+			mockSpawn
+				.mockImplementationOnce(() => firstProc.proc as any)
+				.mockImplementationOnce(() => secondProc.proc as any);
+
+			const process = createProcessUnit(
+				'node',
+				['--version', '--verbose'],
+				[],
+				mockLogger,
+			);
+
+			process.start();
+			firstProc.proc.emit('exit', 0);
+			await process.finished;
+
+			process.restart();
+
+			await new Promise(resolve => setImmediate(resolve));
+
+			expect(mockSpawn).toHaveBeenNthCalledWith(
+				1,
+				'node',
+				['--version', '--verbose'],
+				expect.any(Object),
+			);
+			expect(mockSpawn).toHaveBeenNthCalledWith(
+				2,
+				'node',
+				['--version', '--verbose'],
+				expect.any(Object),
+			);
+		});
+	});
+
+	describe('spawn configuration', () => {
+		it('should spawn with stdin pipe enabled', () => {
+			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
+
+			process.start();
+
+			expect(mockSpawn).toHaveBeenCalledWith('echo', ['hello'], {
+				stdio: ['pipe', 'pipe', 'pipe'],
+			});
+		});
+
+		it('should allow writing to stdin after spawn', () => {
+			const process = createProcessUnit('cat', [], [], mockLogger);
+			const mockStdin = {
+				write: vi.fn(),
+			};
+			stubProc.stdin = mockStdin;
+
+			process.start();
+
+			expect(stubProc.stdin).toBeDefined();
+			expect(() => process.sendStdin('test')).not.toThrow();
 		});
 	});
 });
