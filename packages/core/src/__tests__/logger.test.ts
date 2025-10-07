@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { ProcessLogger } from '../logger';
+import { ProcessLogger } from '../logger.js';
 
 describe.each([['ProcessLogger', ProcessLogger]])(
 	'%s Process logger',
