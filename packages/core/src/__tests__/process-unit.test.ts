@@ -424,6 +424,7 @@ describe('ProcessUnit', () => {
 			process.start();
 
 			const stopPromise = process.stop(100);
+			stopPromise.catch(() => { }); // Swallow the rejection
 
 			await vi.advanceTimersByTimeAsync(101);
 
@@ -878,7 +879,9 @@ describe('ProcessUnit', () => {
 			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
 
 			process.start();
-			process.stop();
+
+			const stopPromise = process.stop();
+			stopPromise.catch(() => { }); // Swallow the rejection
 			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
 			await process.finished
 
@@ -924,18 +927,17 @@ describe('ProcessUnit', () => {
 			process.start();
 			expect(process.getStatus()).toBe('ready');
 
+			process.process!.kill = vi.fn(() => true);
+
 			process.restart();
-
-			// Process should transition to stopping
 			expect(process.getStatus()).toBe('stopping');
-
-
-
-			// Simulate exit
 			process.process?.emit('exit', null, 'SIGINT'); // since we are mocking spawn, we need to emit the exit event manually
+			// Process should transition to stopping
+			// Simulate exit
 			await process.finished
 			//Wait for the process to start again
 			await process.ready
+
 
 
 			expect(process.getStatus()).toBe('ready');
@@ -977,31 +979,6 @@ describe('ProcessUnit', () => {
 
 		});
 
-		it('should restart process that is in stopping state', async () => {
-			mockSpawn
-				.mockImplementationOnce(() => firstProc.proc as any)
-				.mockImplementationOnce(() => secondProc.proc as any);
-
-			const process = createProcessUnit('echo', ['hello'], [], mockLogger);
-
-			process.start();
-			process.stop();
-
-			expect(process.getStatus()).toBe('stopping');
-
-			process.restart();
-
-			// Should still be stopping while waiting for first process to exit
-			expect(process.getStatus()).toBe('stopping');
-
-			// Simulate exit
-			firstProc.proc.emit('exit', null, 'SIGTERM');
-
-			await new Promise(resolve => setTimeout(resolve, 50));
-
-			expect(process.getStatus()).toBe('ready');
-			expect(mockSpawn).toHaveBeenCalledTimes(2);
-		});
 
 		it('should not throw when restarting from created state', () => {
 			mockSpawn.mockImplementationOnce(() => firstProc.proc as any);

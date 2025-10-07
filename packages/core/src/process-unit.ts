@@ -316,7 +316,7 @@ export class ProcessUnit {
 	}
 
 	async stop(
-		timeout: number = 1000,
+		timeout: number = 2000,
 		signal: StopSignal = 'SIGINT',
 	): Promise<void> {
 		if (!this.isRunning()) {
