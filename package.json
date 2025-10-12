@@ -9,12 +9,14 @@
 		"dev": "turbo run dev",
 		"lint": "turbo run lint",
 		"test": "turbo run test",
-		"example": "pnpm --filter @ovrseer/example dev"
+		"example": "pnpm --filter @ovrseer/example dev",
+		"cli": "quickcli --target-dir cli"
 	},
 	"workspaces": [
 		"packages/*"
 	],
 	"devDependencies": {
+		"@razkaroth/quickcli": "^0.1.2",
 		"@sindresorhus/tsconfig": "^3.0.1",
 		"@types/node": "^20.0.0",
 		"@vdemedes/prettier-config": "^2.0.1",
