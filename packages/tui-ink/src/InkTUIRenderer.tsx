@@ -242,10 +242,10 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 		: false;
 
 	useEffect(() => {
-		if (isTailing && logsData && logEntries.length > maxLogLines) {
+		if (isTailing && logsData) {
 			setLogScrollOffset(Math.max(0, logEntries.length - maxLogLines));
 		}
-	}, [logEntries, isTailing, logsData, maxLogLines]);
+	}, [logEntries.length, isTailing, logsData, maxLogLines]);
 
 	const visibleLogEntries = useMemo(() => {
 		const start = logScrollOffset;
@@ -302,6 +302,14 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 					onKeyPress('flag-enter');
 				} else if (processItems[selectedIndex]) {
 					const item = processItems[selectedIndex];
+					const processKey = `${item.type}:${item.id}`;
+					setTailingMap(prev => {
+						const newMap = new Map(prev);
+						if (!newMap.has(processKey)) {
+							newMap.set(processKey, true);
+						}
+						return newMap;
+					});
 					onKeyPress('enter', {processInfo: {id: item.id, type: item.type}});
 					setLogScrollOffset(0);
 				}
