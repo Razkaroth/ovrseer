@@ -196,12 +196,22 @@ export class ProcessUnit {
 
 		if (this._process.stdout) {
 			this._process.stdout.on('data', chunk => {
-				this.logger.addChunk(chunk.toString());
+				const lines = chunk.toString().split('\n');
+				lines.forEach((line: string, index: number) => {
+					if (line || index < lines.length - 1) {
+						this.logger.addChunk(line);
+					}
+				});
 			});
 		}
 		if (this._process.stderr) {
 			this._process.stderr.on('data', chunk => {
-				this.logger.addChunk(chunk.toString(), true);
+				const lines = chunk.toString().split('\n');
+				lines.forEach((line: string, index: number) => {
+					if (line || index < lines.length - 1) {
+						this.logger.addChunk(line, true);
+					}
+				});
 			});
 
 			if (this.crashOnStderr) {
