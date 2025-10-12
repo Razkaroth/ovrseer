@@ -2,11 +2,7 @@
 	"extends": "@sindresorhus/tsconfig",
 	"compilerOptions": {
 		"outDir": "dist",
-		"types": [
-			"vitest/globals"
-		]
+		"types": ["vitest/globals"]
 	},
-	"include": [
-		"source"
-	]
+	"include": ["cli/**/*.ts", "packages/**/*.ts"]
 }

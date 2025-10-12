@@ -1,7 +1,31 @@
 import {type Command} from '@razkaroth/quickcli';
 import {execSync} from 'child_process';
 import {readFileSync, writeFileSync} from 'fs';
-import {isLocalBehindRemote} from '../utils/git-status.js';
+
+function isLocalBehindRemote() {
+	try {
+		// Ensure we have up-to-date info from the remote
+		execSync('git fetch', {stdio: 'ignore'});
+
+		// Get ahead/behind info for current branch
+		const output = execSync('git rev-list --left-right --count HEAD...@{u}')
+			.toString()
+			.trim();
+
+		const [behind, ahead] = output.split('\t').map(Number);
+
+		if (behind && behind > 0) {
+			console.log(`⚠️ Local branch is ${behind} commit(s) behind remote.`);
+			return true;
+		} else {
+			console.log('✅ Local branch is up to date with remote.');
+			return false;
+		}
+	} catch (err: any) {
+		console.error('Error checking remote status:', err.message);
+		return null;
+	}
+}
 
 export const command: Command = {
 	name: 'release',
