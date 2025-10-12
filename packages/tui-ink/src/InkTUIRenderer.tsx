@@ -130,9 +130,28 @@ export const InkTUIRenderer: React.FC<InkTUIRendererProps> = ({
 	const [hasAutoSelected, setHasAutoSelected] = useState(false);
 	const [tailingMap, setTailingMap] = useState<Map<string, boolean>>(new Map());
 	const {stdout} = useStdout();
+	const [dimensions, setDimensions] = useState({
+		height: stdout?.rows ?? 24,
+		width: stdout?.columns ?? 80,
+	});
 
-	const terminalHeight = stdout?.rows ?? 24;
-	const terminalWidth = stdout?.columns ?? 80;
+	useEffect(() => {
+		const handleResize = () => {
+			setDimensions({
+				height: stdout?.rows ?? 24,
+				width: stdout?.columns ?? 80,
+			});
+		};
+
+		process.stdout.on('resize', handleResize);
+
+		return () => {
+			process.stdout.off('resize', handleResize);
+		};
+	}, [stdout]);
+
+	const terminalHeight = dimensions.height;
+	const terminalWidth = dimensions.width;
 
 	const processItems: ProcessItem[] = useMemo(() => {
 		const items: ProcessItem[] = [];
