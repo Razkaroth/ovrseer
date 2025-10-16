@@ -7,6 +7,8 @@
 	"scripts": {
 		"build": "turbo run build",
 		"dev": "turbo run dev",
+		"dev:skywatch": "pnpm --filter @ovrseer/skywatch run dev",
+		"dev:skywatch:debug": "pnpm --filter @ovrseer/skywatch run dev:debug",
 		"lint": "turbo run lint",
 		"test": "turbo run test",
 		"example": "pnpm --filter @ovrseer/example dev",

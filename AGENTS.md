@@ -24,3 +24,7 @@
 - **Error Handling:** Use try/catch blocks. Prefer explicit error types (e.g., `catch (e: any)`)
 - **Comments:** NO comments in code (per codebase convention)
 - **File Structure:** Monorepo using Turborepo. Main code in `packages/core/src/`
+
+## Package Status
+
+- **Deprecated:** `packages/tui-ink` — Do not interact with this package anymore. A new TUI will be written from scratch at `packages/skywatch`.

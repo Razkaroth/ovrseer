@@ -1,12 +1,12 @@
 {
-	"name": "@ovrseer/core",
-	"version": "0.4.3",
+	"name": "@ovrseer/skywatch",
+	"version": "0.1.0",
 	"license": "MIT",
 	"type": "module",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Razkaroth/ovrseer.git",
-		"directory": "packages/core"
+		"directory": "packages/skywatch"
 	},
 	"author": {
 		"name": "Razkaroth",
@@ -25,18 +25,34 @@
 	],
 	"scripts": {
 		"build": "tsc",
-		"dev": "tsc --watch",
+		"dev": "tsx watch src/dev/index.ts",
+		"dev:debug": "DEV=true tsx watch src/dev/index.ts",
+		"start": "node dist/index.js",
 		"lint": "prettier --check .",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
+		"@mishieck/ink-titled-box": "^0.3.0",
+		"@ovrseer/core": "workspace:*",
+		"cli-spinners": "^3.3.0",
+		"ink-tab": "^5.2.0",
+		"ink-task-list": "^2.0.0",
+		"ink-text-input": "^6.0.0",
+		"ink-use-stdout-dimensions": "^1.0.5",
 		"strip-ansi": "^7.1.2"
+	},
+	"peerDependencies": {
+		"react": "^19.0.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",
+		"@types/react": "^19.2.2",
 		"@vitest/ui": "^3.2.4",
+		"ink": "^6.3.1",
+		"react": "^19.2.0",
+		"tsx": "^3.12.7",
 		"typescript": "^5.0.3",
 		"vitest": "^3.2.3"
 	}
