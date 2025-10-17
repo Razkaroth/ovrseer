@@ -1,7 +1,32 @@
 import {ProcessLogger, ProcessUnit} from '@ovrseer/core';
 
+export const processUnits: {
+	dependencies: {
+		[key: string]: {
+			name: string;
+			processkunit: ProcessUnit;
+		};
+	};
+	mainProcesses: {
+		[key: string]: {
+			name: string;
+			processkunit: ProcessUnit;
+		};
+	};
+	cleanupProcesses: {
+		[key: string]: {
+			name: string;
+			processkunit: ProcessUnit;
+		};
+	};
+} = {
+	dependencies: {},
+	mainProcesses: {},
+	cleanupProcesses: {},
+};
+
 const sleep = (t = 1000) =>
-	`await new Promise(resolve => setTimeout(resolve, ${t}))`;
+	`await new Promise(resolve => setTimeout(resolve, ${t}));`;
 
 const fakeLog = (t = 1000, msg = 'Hello ${i}') => `let i = 0;
 setInterval(() => {console.log(\`${msg}\`); i++}, ${t});`;
@@ -21,16 +46,11 @@ dbLogger.addFlag('deletes', {
 	contextWindowSize: 5,
 });
 
-export const devDependencies: ProcessUnit[] = [];
-export const mainProcesses: ProcessUnit[] = [];
-export const cleanupProcesses: ProcessUnit[] = [];
-
-devDependencies.push(
-	new ProcessUnit({
-		command: 'node',
-		args: [
-			'-e',
-			`(async () => {
+const dbDependency = new ProcessUnit({
+	command: 'node',
+	args: [
+		'-e',
+		`(async () => {
 				console.log("Waiting for database to be ready...");
 				${sleep(1000)}
 				console.log("Database is ready!");
@@ -40,11 +60,15 @@ devDependencies.push(
 				${fakeLog(10000, 'Deleted from database ${i}')}
 		})();
 		`,
-		],
-		readyChecks: [{logPattern: /Database is ready!/, timeout: 5000}],
-		logger: dbLogger,
-	}),
-);
+	],
+	readyChecks: [{logPattern: /Database is ready!/, timeout: 5000}],
+	logger: dbLogger,
+});
+
+processUnits.dependencies['db'] = {
+	name: 'db',
+	processkunit: dbDependency,
+};
 
 const redisLogger = new ProcessLogger({
 	maxBufferSize: 1000,
@@ -85,7 +109,10 @@ const redisDependency = new ProcessUnit({
 	logger: redisLogger,
 });
 
-devDependencies.push(redisDependency);
+processUnits.dependencies['redis'] = {
+	name: 'redis',
+	processkunit: redisDependency,
+};
 
 const webLogger = new ProcessLogger({
 	maxBufferSize: 1000,
@@ -125,8 +152,6 @@ const webServerMain = new ProcessUnit({
 	readyChecks: [{logPattern: /Server ready/, timeout: 5000}],
 	logger: webLogger,
 });
-
-mainProcesses.push(webServerMain);
 
 const apiLogger = new ProcessLogger({
 	maxBufferSize: 1000,
@@ -169,8 +194,6 @@ const apiServerMain = new ProcessUnit({
 	logger: apiLogger,
 });
 
-mainProcesses.push(apiServerMain);
-
 const workerLogger = new ProcessLogger({
 	maxBufferSize: 1000,
 	maxLogSize: 100,
@@ -208,8 +231,6 @@ const workerMain = new ProcessUnit({
 	logger: workerLogger,
 });
 
-mainProcesses.push(workerMain);
-
 const echoLogger = new ProcessLogger({
 	maxBufferSize: 1000,
 	maxLogSize: 100,
@@ -240,7 +261,24 @@ const echoProcess = new ProcessUnit({
 	logger: echoLogger,
 });
 
-mainProcesses.push(echoProcess);
+processUnits.mainProcesses['api'] = {
+	name: 'api',
+	processkunit: apiServerMain,
+};
+processUnits.mainProcesses['worker'] = {
+	name: 'worker',
+	processkunit: workerMain,
+};
+
+processUnits.mainProcesses['web'] = {
+	name: 'web',
+	processkunit: webServerMain,
+};
+
+processUnits.mainProcesses['echo'] = {
+	name: 'echo',
+	processkunit: echoProcess,
+};
 
 const cacheLogger = new ProcessLogger({
 	maxBufferSize: 1000,
@@ -279,7 +317,11 @@ const cacheMain = new ProcessUnit({
 	logger: cacheLogger,
 });
 
-devDependencies.push(cacheMain);
+processUnits.dependencies['cache'] = {
+	name: 'cache',
+	processkunit: cacheMain,
+};
+
 // Step 1: Starting cleanup tasks
 const startCleanup = new ProcessUnit({
 	command: 'node',
@@ -367,9 +409,19 @@ const finalizeCleanup = new ProcessUnit({
 	}),
 });
 
-cleanupProcesses.push(
-	startCleanup,
-	flushCacheProcess,
-	closeDbProcess,
-	finalizeCleanup,
-);
+processUnits.cleanupProcesses['start'] = {
+	name: 'start',
+	processkunit: startCleanup,
+};
+processUnits.cleanupProcesses['flush'] = {
+	name: 'flush',
+	processkunit: flushCacheProcess,
+};
+processUnits.cleanupProcesses['close'] = {
+	name: 'close',
+	processkunit: closeDbProcess,
+};
+processUnits.cleanupProcesses['finalize'] = {
+	name: 'finalize',
+	processkunit: finalizeCleanup,
+};
