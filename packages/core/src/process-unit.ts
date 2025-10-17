@@ -6,6 +6,32 @@ import {
 	StopSignal,
 } from './types.js';
 
+type ProcessUnitParams = {
+	command: string;
+	args?: string[];
+	readyChecks: ReadyCheck[];
+	logger: ProcessLoggerI;
+	crashOnStderr?: boolean;
+};
+
+/**
+ * A managed process instance with lifecycle control and monitoring
+ *
+ * This class is a wrapper around the `child_process` module. It provides
+ * methods for starting, stopping, and restarting processes, as well as
+ * handling process lifecycle events and crashes.
+ *
+ * It also allow for awaiting the process ot be ready and finished using
+ * ReadyChecks.
+ *
+ * @param options - The options for the ProcessUnit
+ * @param options.command - The command to run, can be a single string with arguments included.
+ * @param options.extraArgs - Additional arguments to pass to the command
+ * @param options.readyChecks - An array of ReadyCheck objects to use for awaiting the process to be ready
+ * @param options.logger - The logger to use for logging process output
+ * @param options.crashOnStderr - Whether to crash or not when the process writes to stderr. Useful when a process writes warnigns to stderr.
+ */
+
 export class ProcessUnit {
 	private _process: ChildProcess | null = null;
 	private _status: ProcessStatus = 'created';
@@ -25,6 +51,7 @@ export class ProcessUnit {
 	private _wasKilled: boolean = false;
 	private _escalationTimer: NodeJS.Timeout | null = null;
 	private _finishedSettled: boolean = false;
+	private _crashOnStderr: boolean = false;
 
 	command: string;
 	args: string[];
@@ -37,17 +64,29 @@ export class ProcessUnit {
 		return this._process;
 	}
 
-	constructor(
-		command: string,
-		args: string[],
-		readyChecks: ReadyCheck[],
-		logger: ProcessLoggerI,
-		private crashOnStderr: boolean = false,
-	) {
-		this.command = command;
-		this.args = args;
+	constructor({
+		command,
+		args: extraArgs = [],
+		readyChecks,
+		logger,
+		crashOnStderr,
+	}: ProcessUnitParams) {
+		command = command.trim();
+		if (command.length === 0) {
+			throw new Error('Command cannot be empty');
+		}
+		if (command.includes(' ')) {
+			const parts = command.split(' ');
+			this.command = parts[0];
+			this.args = parts.slice(1).concat(extraArgs);
+		} else {
+			this.args = extraArgs;
+			this.command = command;
+		}
+
 		this.readyChecks = readyChecks;
 		this.logger = logger;
+		this._crashOnStderr = crashOnStderr ?? false;
 
 		this._checksPassed = 0;
 
@@ -204,7 +243,7 @@ export class ProcessUnit {
 				this.logger.addChunk(chunk.toString(), true);
 			});
 
-			if (this.crashOnStderr) {
+			if (this._crashOnStderr) {
 				const unsubscribeStderr = this.logger.onError(chunk => {
 					this._cleanupTimersAndSubscriptions();
 					const error = new Error(

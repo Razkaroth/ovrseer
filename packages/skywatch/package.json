@@ -41,7 +41,8 @@
 		"ink-task-list": "^2.0.0",
 		"ink-text-input": "^6.0.0",
 		"ink-use-stdout-dimensions": "^1.0.5",
-		"strip-ansi": "^7.1.2"
+		"strip-ansi": "^7.1.2",
+		"zustand": "^5.0.8"
 	},
 	"peerDependencies": {
 		"react": "^19.0.0"

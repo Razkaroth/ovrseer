@@ -12,49 +12,49 @@ const ovrseer = new Ovrseer({
 	retries: 3,
 });
 
-const mongo = new ProcessUnit(
-	'docker',
-	['compose', '-f', './src/docker-compose.yml', 'up', 'mongo'],
-	[{logPattern: /mongod startup complete/, timeout: 10000}],
-	new ProcessLogger(1000, 100),
-);
+const mongo = new ProcessUnit({
+	command: 'docker',
+	args: ['compose', '-f', './src/docker-compose.yml', 'up', 'mongo'],
+	readyChecks: [{logPattern: /mongod startup complete/, timeout: 10000}],
+	logger: new ProcessLogger({maxBufferSize: 1000, maxLogSize: 100}),
+});
 
-const minio = new ProcessUnit(
-	'docker',
-	['compose', '-f', './src/docker-compose.yml', 'up', 'minio'],
-	[{logPattern: / MinIO Object Storage Server/, timeout: 10000}],
-	new ProcessLogger(1000, 100),
-);
+const minio = new ProcessUnit({
+	command: 'docker',
+	args: ['compose', '-f', './src/docker-compose.yml', 'up', 'minio'],
+	readyChecks: [{logPattern: / MinIO Object Storage Server/, timeout: 10000}],
+	logger: new ProcessLogger({maxBufferSize: 1000, maxLogSize: 100}),
+});
 
-const ngrok = new ProcessUnit(
-	'ngrok',
-	'http --host-header=rewrite 3000'.split(' '),
-	[{logPattern: /online/, timeout: 10000}],
-	new ProcessLogger(1000, 100),
-);
+const ngrok = new ProcessUnit({
+	command: 'ngrok',
+	args: 'http --host-header=rewrite 3000'.split(' '),
+	readyChecks: [{logPattern: /online/, timeout: 10000}],
+	logger: new ProcessLogger({maxBufferSize: 1000, maxLogSize: 100}),
+});
 
 ovrseer.addDependency('Minio', minio);
 ovrseer.addDependency('MongoDB', mongo);
 ovrseer.addDependency('Ngrok Forwarding', ngrok);
 
-const workerLogger = new ProcessLogger(1000, 100);
-const worker = new ProcessUnit(
-	'node',
-	[
+const workerLogger = new ProcessLogger({maxBufferSize: 1000, maxLogSize: 100});
+const worker = new ProcessUnit({
+	command: 'node',
+	args: [
 		'-e',
 		'let count = 0; setInterval(() => { count++; console.log(`Processing job ${count}...`); if (count % 2 === 0) console.log("Job completed"); }, 4000)',
 	],
-	[],
-	workerLogger,
-);
+	readyChecks: [],
+	logger: workerLogger,
+});
 
-const whoamiLogger = new ProcessLogger(1000, 100);
-const whoami = new ProcessUnit(
-	'docker',
-	['compose', '-f', './src/docker-compose.yml', 'exec', 'mongo', 'whoami'],
-	[],
-	whoamiLogger,
-);
+const whoamiLogger = new ProcessLogger({maxBufferSize: 1000, maxLogSize: 100});
+const whoami = new ProcessUnit({
+	command: 'docker',
+	args: ['compose', '-f', './src/docker-compose.yml', 'exec', 'mongo', 'whoami'],
+	readyChecks: [],
+	logger: whoamiLogger,
+});
 
 ovrseer.addMainProcess('worker', worker);
 ovrseer.addMainProcess('whoami', whoami);

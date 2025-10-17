@@ -40,6 +40,13 @@ export class Ovrseer implements OvrseerI {
 		this.crashReporter = options?.crashReporter ?? new CrashReporter();
 		this.events = new EventEmitter();
 	}
+	getCurrentWorkTree() {
+		return {
+			dependencies: this.dependencies,
+			main: this.mainProcesses,
+			cleanup: this.cleanupProcesses,
+		};
+	}
 
 	get on() {
 		return <K extends keyof ProcessManagerEvents>(
@@ -353,6 +360,45 @@ export class Ovrseer implements OvrseerI {
 			timestamp: Date.now(),
 		});
 		process.restart();
+		this.emitStateUpdate();
+	}
+	stopProcess(id: string, processType?: TUIProcessType): void {
+		let process: ProcessUnitI | undefined;
+		let actualType: TUIProcessType | undefined;
+		if (processType === 'dependency') {
+			process = this.dependencies.get(id);
+			actualType = 'dependency';
+		} else if (processType === 'cleanup') {
+			process = this.cleanupProcesses.get(id);
+			actualType = 'cleanup';
+		} else {
+			process =
+				this.mainProcesses.get(id) ||
+				this.dependencies.get(id) ||
+				this.cleanupProcesses.get(id);
+			if (process) {
+				if (this.mainProcesses.has(id)) actualType = 'main';
+				else if (this.dependencies.has(id)) actualType = 'dependency';
+				else if (this.cleanupProcesses.has(id)) actualType = 'cleanup';
+			}
+		}
+		if (!process || !actualType) {
+			this.emit('status:message', {
+				message: `Process ${id} not found`,
+				timestamp: Date.now(),
+			});
+			return;
+		}
+		this.emit('process:stopping', {
+			id,
+			type: actualType,
+			timestamp: Date.now(),
+		});
+		this.emit('status:message', {
+			message: `Stopping ${id}...`,
+			timestamp: Date.now(),
+		});
+		process.stop();
 		this.emitStateUpdate();
 	}
 

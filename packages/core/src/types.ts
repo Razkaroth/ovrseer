@@ -167,6 +167,12 @@ export type ProcessManagerEvents = {
 	};
 };
 
+export interface OvrseerWorkTree {
+	dependencies: Map<string, ProcessUnitI>;
+	main: Map<string, ProcessUnitI>;
+	cleanup: Map<string, ProcessUnitI>;
+}
+
 export interface OvrseerI {
 	addDependency(id: string, process: ProcessUnitI): void;
 	removeDependency(id: string): void;
@@ -177,11 +183,13 @@ export interface OvrseerI {
 	addCleanupProcess(id: string, process: ProcessUnitI): void;
 	removeCleanupProcess(id: string): void;
 	getCleanupProcess(id: string): ProcessUnitI | undefined;
+	getCurrentWorkTree(): OvrseerWorkTree;
 
 	start(): void;
 	stop(): Promise<void>;
 
 	restartProcess(id: string, processType?: TUIProcessType): void;
+	stopProcess(id: string, processType?: TUIProcessType): void;
 
 	restartAll(): void;
 	restartAllMainProcesses(): void;

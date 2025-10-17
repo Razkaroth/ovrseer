@@ -8,6 +8,12 @@ import {
 	LogType,
 } from './types.js';
 
+type ProcessLoggerParams = {
+	maxLogSize?: number;
+	maxBufferSize?: number;
+	defaultSeparator?: string;
+};
+
 export class ProcessLogger implements ProcessLoggerI {
 	private _buffer: LogEntry[] = [];
 	private _errorBuffer: string[] = [];
@@ -33,11 +39,11 @@ export class ProcessLogger implements ProcessLoggerI {
 		return this._errorBuffer;
 	}
 
-	constructor(
-		maxBufferSize: number,
-		maxLogSize: number,
-		defaultSeparator?: string,
-	) {
+	constructor({
+		maxLogSize = 1000,
+		maxBufferSize = 1000,
+		defaultSeparator = '\n',
+	}: ProcessLoggerParams) {
 		if (maxLogSize > maxBufferSize) {
 			throw new Error('maxLogSize cannot be greater than maxBufferSize');
 		}
