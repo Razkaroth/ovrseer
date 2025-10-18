@@ -41,8 +41,14 @@ export function createProcessUnit(
 	checks: ReadyCheck[],
 	logger?: ProcessLogger,
 ) {
-	const processLogger = logger ?? new ProcessLogger({maxBufferSize: 10, maxLogSize: 5});
-	return new ProcessUnit({command, args, readyChecks: checks, logger: processLogger});
+	const processLogger =
+		logger ?? new ProcessLogger({maxBufferSize: 10, maxLogSize: 5});
+	return new ProcessUnit({
+		command,
+		args,
+		readyChecks: checks,
+		logger: processLogger,
+	});
 }
 
 /**

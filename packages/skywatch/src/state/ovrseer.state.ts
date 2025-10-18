@@ -1,8 +1,6 @@
 import {OvrseerI, OvrseerWorkTree, ProcessUnitI} from '@ovrseer/core';
 import {create} from 'zustand';
 
-// type Focus = 'Main' | 'Logs' | 'status-bar' | 'Worktree';
-
 export enum Focus {
 	Main = 'Main',
 	Logs = 'Logs',
@@ -83,15 +81,13 @@ export interface OvrseerState {
 	currentProcessId: string | null;
 	currentProcessUnit: ProcessUnitI | null;
 
-	// Process States
 	processStates: Map<string, ProcessStatus>;
 	messages: {message: string; timestamp: number}[];
+	messageScrollOffset: number;
 
-	// Instructions
 	globalInstructions: {name: string; description: string}[];
 	currentFocus: Focus;
 	currentInstructions: {name: string; description: string}[];
-	// Setters
 	setOvrseer: (ovrseer: OvrseerI) => void;
 	start: () => void;
 	stop: () => Promise<void>;
@@ -101,6 +97,7 @@ export interface OvrseerState {
 	setCurrentProcessId: (id: string) => void;
 	setCurrentFocus: (focus: Focus) => void;
 	updateProcessState: (id: string, status: ProcessStatus) => void;
+	scrollMessages: (direction: 'up' | 'down') => void;
 }
 
 export const useOvrseer = create<OvrseerState>()(set => ({
@@ -113,15 +110,13 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 	currentInstructions: Instructions[Focus.Main],
 	processStates: new Map(),
 	messages: [],
+	messageScrollOffset: 0,
 
-	// Setters
 	setOvrseer: (ovrseer: OvrseerI) => {
-		// We start with the first dependency as the current process
 		const worktree = ovrseer.getCurrentWorkTree();
 		const firstDependency = worktree.dependencies.keys().next().value;
 		if (!firstDependency) return;
 
-		// Initialize process states
 		const processStates = new Map<string, ProcessStatus>();
 		const initializeProcessIds = (ids?: readonly string[] | null) => {
 			if (!ids) return;
@@ -138,7 +133,6 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 		initializeProcessIds(worktree.mainIds);
 		initializeProcessIds(worktree.cleanupIds);
 
-		// Set up event listeners for process lifecycle
 		ovrseer.on('process:started', ({id}) => {
 			set(state => {
 				const newProcessStates = new Map(state.processStates);
@@ -236,15 +230,21 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 				};
 			});
 		});
+
 		ovrseer.on('status:message', ({message}) => {
 			set(state => {
-				const newMessages = state.messages.concat({
+				const maxMessages = 100;
+				let newMessages = state.messages.concat({
 					message,
 					timestamp: Date.now(),
 				});
+				if (newMessages.length > maxMessages) {
+					newMessages = newMessages.slice(-maxMessages);
+				}
 				return {
 					...state,
 					messages: newMessages,
+					messageScrollOffset: 0,
 				};
 			});
 		});
@@ -295,6 +295,7 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 		if (!this.ovrseer) return;
 		this.ovrseer.stopProcess(id);
 	},
+
 	setCurrentProcessId(id: string) {
 		set(state => {
 			return {
@@ -311,6 +312,20 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 			return {
 				...state,
 				processStates: newProcessStates,
+			};
+		});
+	},
+
+	scrollMessages(direction: 'up' | 'down') {
+		set(state => {
+			const maxScroll = Math.max(0, state.messages.length - 10);
+			const newOffset =
+				direction === 'down'
+					? Math.min(state.messageScrollOffset + 1, maxScroll)
+					: Math.max(state.messageScrollOffset - 1, 0);
+			return {
+				...state,
+				messageScrollOffset: newOffset,
 			};
 		});
 	},

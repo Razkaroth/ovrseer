@@ -18,7 +18,6 @@ export const MainUI: React.FC<{ovrseer: OvrseerI}> = ({ovrseer}) => {
 	useEffect(() => {
 		if (!ovrseerState.ovrseer) {
 			ovrseerState.setOvrseer(ovrseer);
-			// focus the main panel after setting the ovrseer
 			focus(Focus.Main);
 			ovrseerState.setCurrentFocus(Focus.Main);
 		}
@@ -52,11 +51,11 @@ export const MainUI: React.FC<{ovrseer: OvrseerI}> = ({ovrseer}) => {
 	return (
 		<Box width={columns} height={rows} flexDirection="column">
 			<TitledBox
-				key={`main-ui-${columns}-${rows}-${tick}`} // force re-render on tick
+				key={`main-ui-${columns}-${rows}-${tick}`}
 				marginTop={1}
 				borderStyle="single"
 				titleStyles={titleStyles.hexagon}
-				titles={[` Ovrseer`]}
+				titles={[` Ovrseer`]}
 				titleJustify="center"
 				padding={1}
 				flexDirection="column"
