@@ -4,19 +4,19 @@ export const processUnits: {
 	dependencies: {
 		[key: string]: {
 			name: string;
-			processkunit: ProcessUnit;
+			processUnit: ProcessUnit;
 		};
 	};
 	mainProcesses: {
 		[key: string]: {
 			name: string;
-			processkunit: ProcessUnit;
+			processUnit: ProcessUnit;
 		};
 	};
 	cleanupProcesses: {
 		[key: string]: {
 			name: string;
-			processkunit: ProcessUnit;
+			processUnit: ProcessUnit;
 		};
 	};
 } = {
@@ -67,7 +67,7 @@ const dbDependency = new ProcessUnit({
 
 processUnits.dependencies['db'] = {
 	name: 'db',
-	processkunit: dbDependency,
+	processUnit: dbDependency,
 };
 
 const redisLogger = new ProcessLogger({
@@ -111,7 +111,7 @@ const redisDependency = new ProcessUnit({
 
 processUnits.dependencies['redis'] = {
 	name: 'redis',
-	processkunit: redisDependency,
+	processUnit: redisDependency,
 };
 
 const webLogger = new ProcessLogger({
@@ -263,21 +263,21 @@ const echoProcess = new ProcessUnit({
 
 processUnits.mainProcesses['api'] = {
 	name: 'api',
-	processkunit: apiServerMain,
+	processUnit: apiServerMain,
 };
 processUnits.mainProcesses['worker'] = {
 	name: 'worker',
-	processkunit: workerMain,
+	processUnit: workerMain,
 };
 
 processUnits.mainProcesses['web'] = {
 	name: 'web',
-	processkunit: webServerMain,
+	processUnit: webServerMain,
 };
 
 processUnits.mainProcesses['echo'] = {
 	name: 'echo',
-	processkunit: echoProcess,
+	processUnit: echoProcess,
 };
 
 const cacheLogger = new ProcessLogger({
@@ -319,7 +319,7 @@ const cacheMain = new ProcessUnit({
 
 processUnits.dependencies['cache'] = {
 	name: 'cache',
-	processkunit: cacheMain,
+	processUnit: cacheMain,
 };
 
 // Step 1: Starting cleanup tasks
@@ -411,17 +411,17 @@ const finalizeCleanup = new ProcessUnit({
 
 processUnits.cleanupProcesses['start'] = {
 	name: 'start',
-	processkunit: startCleanup,
+	processUnit: startCleanup,
 };
 processUnits.cleanupProcesses['flush'] = {
 	name: 'flush',
-	processkunit: flushCacheProcess,
+	processUnit: flushCacheProcess,
 };
 processUnits.cleanupProcesses['close'] = {
 	name: 'close',
-	processkunit: closeDbProcess,
+	processUnit: closeDbProcess,
 };
 processUnits.cleanupProcesses['finalize'] = {
 	name: 'finalize',
-	processkunit: finalizeCleanup,
+	processUnit: finalizeCleanup,
 };

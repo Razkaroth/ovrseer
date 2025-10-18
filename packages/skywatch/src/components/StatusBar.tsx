@@ -8,7 +8,7 @@ export const StatusBar: React.FC<{}> = () => {
 	const ovrseerState = useOvrseer();
 	return (
 		<TitledBox
-			titles={[' StatusBar ']}
+			titles={[' StatusBar ', ovrseerState.currentFocus]}
 			borderStyle="single"
 			flexDirection="row"
 			height="20%"
@@ -21,7 +21,7 @@ export const StatusBar: React.FC<{}> = () => {
 				flexGrow={1}
 				paddingX={1}
 			>
-				<Text>Hello, world! this is the status bar</Text>
+				<Text>Press ? to open help</Text>
 			</TitledBox>
 		</TitledBox>
 	);

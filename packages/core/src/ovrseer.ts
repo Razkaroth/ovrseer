@@ -45,6 +45,9 @@ export class Ovrseer implements OvrseerI {
 			dependencies: this.dependencies,
 			main: this.mainProcesses,
 			cleanup: this.cleanupProcesses,
+			dependenciesIds: Array.from(this.dependencies.keys()),
+			mainIds: Array.from(this.mainProcesses.keys()),
+			cleanupIds: Array.from(this.cleanupProcesses.keys()),
 		};
 	}
 

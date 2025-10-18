@@ -169,8 +169,11 @@ export type ProcessManagerEvents = {
 
 export interface OvrseerWorkTree {
 	dependencies: Map<string, ProcessUnitI>;
+	dependenciesIds: string[];
 	main: Map<string, ProcessUnitI>;
+	mainIds: string[];
 	cleanup: Map<string, ProcessUnitI>;
+	cleanupIds: string[];
 }
 
 export interface OvrseerI {
