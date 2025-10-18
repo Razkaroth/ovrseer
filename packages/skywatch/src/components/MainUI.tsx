@@ -11,13 +11,21 @@ import {Worktree} from './Worktree';
 export const MainUI: React.FC<{ovrseer: OvrseerI}> = ({ovrseer}) => {
 	const ovrseerState = useOvrseer();
 	const [columns, rows] = useStdoutDimensions();
-	const {isFocused, focus} = useFocus({id: 'main-ui'});
+	const {isFocused, focus} = useFocus({id: Focus.Main});
 	const [showHelp, setShowHelp] = useState(false);
+	const [tick, setTick] = useState(0);
 
 	useEffect(() => {
 		if (!ovrseerState.ovrseer) {
 			ovrseerState.setOvrseer(ovrseer);
+			// focus the main panel after setting the ovrseer
+			focus(Focus.Main);
+			ovrseerState.setCurrentFocus(Focus.Main);
 		}
+		const interval = setInterval(() => {
+			setTick(tick + 1);
+		}, 1000);
+		return () => clearInterval(interval);
 	}, []);
 
 	useInput((input, key) => {
@@ -27,19 +35,28 @@ export const MainUI: React.FC<{ovrseer: OvrseerI}> = ({ovrseer}) => {
 		if (showHelp && (key.escape || input === 'q' || input === '?')) {
 			setShowHelp(false);
 		}
-		if (isFocused && ovrseerState.currentFocus !== Focus.Main) {
+		if (!isFocused) {
+			return;
+		}
+		if (ovrseerState.currentFocus !== Focus.Main) {
 			ovrseerState.setCurrentFocus(Focus.Main);
+		}
+		if (input === 's') {
+			ovrseer.start();
+		}
+		if (input === 'S') {
+			ovrseer.stop();
 		}
 	});
 
 	return (
 		<Box width={columns} height={rows} flexDirection="column">
 			<TitledBox
-				key={`main-ui-${columns}-${rows}`}
+				key={`main-ui-${columns}-${rows}-${tick}`} // force re-render on tick
 				marginTop={1}
 				borderStyle="single"
 				titleStyles={titleStyles.hexagon}
-				titles={[' Ovrseer   ']}
+				titles={[` Ovrseer`]}
 				titleJustify="center"
 				padding={1}
 				flexDirection="column"

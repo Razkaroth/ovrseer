@@ -28,9 +28,6 @@ export const processUnits: {
 const sleep = (t = 1000) =>
 	`await new Promise(resolve => setTimeout(resolve, ${t}));`;
 
-const fakeLog = (t = 1000, msg = 'Hello ${i}') => `let i = 0;
-setInterval(() => {console.log(\`${msg}\`); i++}, ${t});`;
-
 const dbLogger = new ProcessLogger({
 	maxBufferSize: 100,
 	maxLogSize: 100,
@@ -51,13 +48,18 @@ const dbDependency = new ProcessUnit({
 	args: [
 		'-e',
 		`(async () => {
-				console.log("Waiting for database to be ready...");
-				${sleep(1000)}
-				console.log("Database is ready!");
-				${sleep(2000)}
-				${fakeLog(800, 'Wrote to database ${i}')}
-				${fakeLog(300, 'Read from database ${i}')}
-				${fakeLog(10000, 'Deleted from database ${i}')}
+		    console.log("Waiting for database to be ready...");
+			console.log("Database is ready!");
+			await new Promise(resolve => setTimeout(resolve, 2000));
+     setInterval(() => {
+        console.log("Wrote to database");
+     }, 800);
+     setInterval(() => {
+        console.log("Read from database");
+     }, 300);
+     setInterval(() => {
+        console.log("Deleted from database");
+     }, 10000);
 		})();
 		`,
 	],
@@ -243,13 +245,12 @@ const echoProcess = new ProcessUnit({
 		'-e',
 		`while (true) {
 			process.stdin.setEncoding("utf8");
-			process.stdout.write("What is your name?\\n");
+      process.stdout.write("Echo service started\\n");
 			let buf = "";
 			process.stdin.on("data", d => {
 				buf += d;
 				if (buf.includes("\\n")) {
-					const name = buf.trim();
-					console.log("Hi " + name + "!");
+					console.log(buf.trim());
 				}
 				if (buf.includes("exit")) {
 					process.exit(0);

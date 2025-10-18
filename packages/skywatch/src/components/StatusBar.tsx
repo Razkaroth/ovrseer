@@ -1,11 +1,12 @@
 import {TitledBox} from '@mishieck/ink-titled-box';
-import {Text} from 'ink';
+import {Box, Static, Text} from 'ink';
 import React from 'react';
 import {useOvrseer} from '../state/ovrseer.state';
 import {ProcessStatus} from './ProcessStatus';
 
 export const StatusBar: React.FC<{}> = () => {
 	const ovrseerState = useOvrseer();
+
 	return (
 		<TitledBox
 			titles={[' StatusBar ', ovrseerState.currentFocus]}
@@ -20,8 +21,18 @@ export const StatusBar: React.FC<{}> = () => {
 				flexDirection="column"
 				flexGrow={1}
 				paddingX={1}
+				overflowY="hidden"
 			>
-				<Text>Press ? to open help</Text>
+				<Static items={ovrseerState.messages}>
+					{(message, index) => (
+						<Box flexDirection="row" key={index} columnGap={1}>
+							<Text dimColor>
+								{new Date(message.timestamp).toLocaleTimeString()}
+							</Text>
+							<Text>{message.message}</Text>
+						</Box>
+					)}
+				</Static>
 			</TitledBox>
 		</TitledBox>
 	);

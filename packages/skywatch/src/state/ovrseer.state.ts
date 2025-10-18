@@ -85,6 +85,7 @@ export interface OvrseerState {
 
 	// Process States
 	processStates: Map<string, ProcessStatus>;
+	messages: {message: string; timestamp: number}[];
 
 	// Instructions
 	globalInstructions: {name: string; description: string}[];
@@ -111,6 +112,7 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 	globalInstructions: GlobalInstructions,
 	currentInstructions: Instructions[Focus.Main],
 	processStates: new Map(),
+	messages: [],
 
 	// Setters
 	setOvrseer: (ovrseer: OvrseerI) => {
@@ -231,6 +233,18 @@ export const useOvrseer = create<OvrseerState>()(set => ({
 				return {
 					...state,
 					processStates: newProcessStates,
+				};
+			});
+		});
+		ovrseer.on('status:message', ({message}) => {
+			set(state => {
+				const newMessages = state.messages.concat({
+					message,
+					timestamp: Date.now(),
+				});
+				return {
+					...state,
+					messages: newMessages,
 				};
 			});
 		});

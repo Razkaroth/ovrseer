@@ -198,6 +198,13 @@ export class Ovrseer implements OvrseerI {
 		if (this.mainProcesses.size === 0) {
 			throw new Error('No main processes to start');
 		}
+		if (this.isRunning) {
+			this.emit('status:message', {
+				message: 'Already running',
+				timestamp: Date.now(),
+			});
+			return;
+		}
 
 		this.isRunning = true;
 		this.emit('manager:started', {timestamp: Date.now()});
@@ -260,6 +267,13 @@ export class Ovrseer implements OvrseerI {
 	}
 
 	async stop(): Promise<void> {
+		if (!this.isRunning) {
+			this.emit('status:message', {
+				message: 'Not running',
+				timestamp: Date.now(),
+			});
+			return;
+		}
 		this.isRunning = false;
 		this.emit('manager:stopping', {timestamp: Date.now()});
 
